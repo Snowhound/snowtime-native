@@ -1,0 +1,2 @@
+# The image only adds k6 to the render harness image; it needs no build context.
+*

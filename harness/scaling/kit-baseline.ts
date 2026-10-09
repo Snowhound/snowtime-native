@@ -10,6 +10,7 @@ import { dataset } from '../../app/perf/stress/dataset'
 import { checkOtherSessions, reserveStack } from '../../app/perf/stress/lock'
 import { record } from '../../app/perf/stress/record'
 import { LOCAL_SECRET } from '../../app/perf/stress/stack'
+import { machineCommands } from '../gate/machine'
 
 const { values } = parseArgs({
   options: {
@@ -205,9 +206,7 @@ try {
     command('git', ['status', '--short', '--ignore-submodules=none'], 'checkout-status.txt')
     command('git', ['diff', '--submodule=diff', 'HEAD'], 'checkout.patch')
     command('uname', ['-a'], 'uname.txt')
-    command('lscpu', [], 'cpu.txt')
-    command('free', ['-b'], 'memory.txt')
-    command('docker', ['info'], 'docker-info.txt')
+    for (const [program, args, file] of machineCommands()) command(program, args, file)
     command('docker', ['version'], 'docker-version.txt')
     if (JSON.stringify(images('images.json')) !== JSON.stringify(prepared.images))
       throw new Error('Images changed since preparation')

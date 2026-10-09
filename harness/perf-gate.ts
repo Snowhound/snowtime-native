@@ -9,6 +9,7 @@ import { checkNativeBenchmarkHealth } from '../app/perf/stress/health'
 import { checkOtherSessions, reserveStack } from '../app/perf/stress/lock'
 import { droppedActions } from '../app/perf/stress/metrics'
 import { LOCAL_SECRET } from '../app/perf/stress/stack'
+import { machineCommands } from './gate/machine'
 import { compareMetric } from './gate/metrics'
 import { processUsage, startNative } from './native'
 import { nativeHotTimings } from './timings'
@@ -38,6 +39,7 @@ for (const value of [values.renders, values.repeats, values.rate])
     throw new Error('Counts and rate must be positive integers')
 const PORT = resolve(import.meta.dir, '..')
 const gate = join(CACHE, 'native-gate')
+const MODULES_VOLUME = 'snowtime-perf-gate-node-modules'
 const out = values.out ?? join(gate, 'runs', new Date().toISOString().replaceAll(':', '-'))
 mkdirSync(out, { recursive: true })
 const commands: unknown[] = []
@@ -243,6 +245,8 @@ async function replay(server: { url: string; pid: number }, round: string) {
   return { cpu_ms: (after.cpuMs - before.cpuMs) / requests, peak_rss_mib: after.peakMiB }
 }
 async function inside() {
+  // Without scripts: the app's prepare hook would install git hooks in the host's checkout.
+  command('bun', ['install', '--frozen-lockfile', '--ignore-scripts'], 'install.log', {}, ROOT)
   const inputs = join(gate, 'inputs')
   const all: Record<string, Record<string, number>> = {}
   for (const [index, name] of ['baseline', 'current', 'baseline', 'current'].entries()) {
@@ -527,7 +531,7 @@ async function main() {
         if (hash(join(gate, 'inputs', file)) !== (h as { sha256: string }).sha256)
           throw new Error(`Changed gate input ${file}`)
       command('uname', ['-a'], 'machine.txt')
-      command('lscpu', [], 'cpu.txt')
+      for (const [program, args, log] of machineCommands()) command(program, args, log)
       command('docker', ['image', 'inspect', 'snowtime-perf-gate:runtime'], 'runtime-image.json')
       const running = command('docker', ['ps', '--format', '{{.Names}}'], 'running-containers.txt')
         .trim()
@@ -556,6 +560,9 @@ async function main() {
           '--memory-swap=2g',
           '-v',
           `${PORT}:/repo`,
+          // The app's packages for Linux, over the host's, which may be macOS builds.
+          '-v',
+          `${MODULES_VOLUME}:/repo/app/node_modules`,
           'snowtime-perf-gate:runtime',
           `--out=/repo/${relative(PORT, out)}`,
           `--renders=${values.renders}`,
