@@ -11,7 +11,7 @@ import { createClient } from '@libsql/client'
 import { spawn } from 'node:child_process'
 import { cpSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { freePort } from './app'
+import { freePort } from './native'
 import { CACHE, SEED_NOW, USERS, seededDatabase } from '../app/perf/lib/database'
 
 const [control, candidate] = process.argv.slice(2)

@@ -20,20 +20,15 @@ deploy/        the release image, the V8 archive script, and the load harness pa
 docs/          the port's architecture and the 081 records
 ```
 
-Pinned at snowtime `1eedd18`. Against it the native host passes all 66 conformance tests
-(570 assertions, 13 files), all 1,490 `compare.ts` calls byte for byte, and the 17
-`hardening-compare.ts` checks. `page-compare.ts` finds all 59 pages byte-equal to the
-proof of concept's host at the same commit. `node_modules` links to `app/node_modules`,
-so the harness and the adapter run on the app's packages.
+Pinned at snowtime `main`'s head, `54ae90f`; the pin follows `main`. Against it the
+native host passes all 66 conformance tests (570 assertions, 13 files), all 1,490
+`compare.ts` calls byte for byte, and the 17 `hardening-compare.ts` checks.
+`node_modules` links to `app/node_modules`, so the harness and the adapter run on the
+app's packages.
 
-Two pieces stand in for app changes that aren't at the pin yet:
-
-- `conformance/` holds the auth-writes, OAuth, passkey, login-domain, and tenancy tests,
-  and the split invitations test. `harness/app.ts` adds `startApp`'s `env` option and
-  OAuth preload. snowtime `main` has both from `54ae90f`; once the pin reaches it, delete
-  `harness/app.ts` and the files the app has taken.
-- `deploy/load/app.patch` holds the load harness changes that `perf:stress --app=native`
-  and `harness/scaling/` need ([deploy/load/README.md](deploy/load/README.md)).
+`deploy/load/app.patch` holds the load harness changes that `perf:stress --app=native` and
+`harness/scaling/` need, which the app hasn't taken
+([deploy/load/README.md](deploy/load/README.md)).
 
 The audit records are linked from here:
 [Task 081.30](docs/tasks/081-native-backend/30-audit.md#parity-record) records the audit's
@@ -180,7 +175,7 @@ server-rendering harness. It, and so the host, needs its JavaScript bundle built
 ```sh
 bun install --cwd app --frozen-lockfile
 bun install --cwd adapter --frozen-lockfile
-(cd app && bun run i18n:compile && bunx --bun vite build)
+(cd app && bun --bun run build)
 bun adapter/build.ts
 ```
 
@@ -271,7 +266,7 @@ Both need the `bench` build: the OAuth calls reach the fake provider through
 
 `conformance.ts` serves the binary a copy of the benchmark database at `SEED_NOW` and
 runs each conformance file against its own server: the app's `app/conformance/`, plus this
-repository's `conformance/`, the tests the app hasn't taken yet. A file here replaces the
+repository's `conformance/`, the tests the app hasn't taken yet (none now). A file here replaces the
 app's file of the same name. Give test files after the binary to run only those. `compare.ts` sends the same reads to the
 TypeScript build and the binary and fails on any answer that differs in status or bytes,
 masking only each server's clock, sign-in time, and URL. It also compares malformed

@@ -3,7 +3,7 @@
 import { createClient } from '@libsql/client'
 import { strict as assert } from 'node:assert'
 import { join } from 'node:path'
-import { buildApp, startApp } from './app'
+import { buildApp, startApp } from '../app/perf/lib/app'
 import { CACHE, USERS, seededDatabase } from '../app/perf/lib/database'
 import { startNative } from './native'
 

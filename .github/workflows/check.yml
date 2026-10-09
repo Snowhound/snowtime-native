@@ -52,7 +52,7 @@ jobs:
         run: |
           bun install --cwd app --frozen-lockfile
           bun install --cwd adapter --frozen-lockfile
-          (cd app && bun run i18n:compile && bunx --bun vite build)
+          (cd app && bun --bun run build)
           bun adapter/build.ts
 
       - name: TypeScript and adapter tests
@@ -108,7 +108,7 @@ jobs:
             git submodule update --init
             bun install --cwd app --frozen-lockfile
             bun install --cwd adapter --frozen-lockfile
-            (cd app && bun run i18n:compile && bunx --bun vite build)
+            (cd app && bun --bun run build)
             bun adapter/build.ts
             # The base may lock another v8, so it gets its own checked library.
             deploy/v8-archive.sh Cargo.lock "$RUNNER_TEMP/base-v8.a.gz"

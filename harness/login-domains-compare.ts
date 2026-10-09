@@ -5,9 +5,9 @@ import {
   BLOCKED_COOKIE,
   LOGIN_DOMAINS_ENV,
   loginDomainsDatabase,
-} from '../conformance/login-domains-fixture'
-import type { OAuthObservation } from '../conformance/oauth-flow'
-import { startApp } from './app'
+} from '../app/conformance/login-domains-fixture'
+import type { OAuthObservation } from '../app/conformance/oauth-flow'
+import { startApp } from '../app/perf/lib/app'
 import { COMPANY, USERS } from '../app/perf/lib/database'
 import { startNative } from './native'
 

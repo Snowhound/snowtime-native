@@ -4,7 +4,7 @@
 import { createClient } from '@libsql/client'
 import { join } from 'node:path'
 import { startNative } from '../native'
-import { startApp } from '../app'
+import { startApp } from '../../app/perf/lib/app'
 import { CACHE, SEED_NOW, USERS, seededDatabase } from '../../app/perf/lib/database'
 
 async function probe(label: string, app: { url: string; stop: () => Promise<void> }, db: string) {

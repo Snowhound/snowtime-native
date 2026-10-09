@@ -10,8 +10,8 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { LOGIN_DOMAINS_ENV, loginDomainsDatabase } from '../conformance/login-domains-fixture'
-import { oauthEnv, startOAuthProvider } from '../conformance/oauth-provider'
+import { LOGIN_DOMAINS_ENV, loginDomainsDatabase } from '../app/conformance/login-domains-fixture'
+import { oauthEnv, startOAuthProvider } from '../app/conformance/oauth-provider'
 import { ROOT, seededDatabase } from '../app/perf/lib/database'
 import { startNative } from './native'
 

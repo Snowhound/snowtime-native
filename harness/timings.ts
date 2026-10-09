@@ -6,7 +6,7 @@
 //   bun harness/timings.ts target/release/snowtime-axum [repeats]
 
 import { v7 as uuidv7 } from 'uuid'
-import { buildApp, signInHeaders, startApp } from './app'
+import { buildApp, signInHeaders, startApp } from '../app/perf/lib/app'
 import { COMPANY, SEED_NOW, seededDatabase } from '../app/perf/lib/database'
 import { CALLS, type CallName, requestOf } from './calls'
 import { startNative } from './native'

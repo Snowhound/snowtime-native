@@ -6,7 +6,7 @@ import { spawn, execSync } from 'node:child_process'
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { connect } from 'node:net'
 import { join } from 'node:path'
-import { freePort } from '../app'
+import { freePort } from '../native'
 import { CACHE, COMPANY, SEED_NOW, USERS, seededDatabase } from '../../app/perf/lib/database'
 
 const [binary, ...experiments] = process.argv.slice(2)
