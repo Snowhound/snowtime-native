@@ -1,0 +1,174 @@
+mod config;
+mod edge;
+mod health;
+mod memory;
+mod pages;
+
+use axum::Router;
+use std::sync::Arc;
+
+// Tokio's blocking pool serves only public files and DNS lookups; the database and
+// password lanes have threads of their own.
+const BLOCKING_THREADS: usize = 4;
+
+async fn shutdown() {
+    let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        .expect("SIGTERM handler");
+    tokio::select! { _ = tokio::signal::ctrl_c() => {}, _ = terminate.recv() => {} }
+}
+
+fn main() {
+    let perf_now =
+        snowtime_server::clock::init_from_env().unwrap_or_else(|message| panic!("{message}"));
+    let config = config::from_env().unwrap_or_else(|message| panic!("{message}"));
+    let mut builder = match std::env::var("TOKIO_RUNTIME").as_deref() {
+        Ok("current_thread") => tokio::runtime::Builder::new_current_thread(),
+        Ok("multi_thread") | Err(_) => tokio::runtime::Builder::new_multi_thread(),
+        Ok(_) => panic!("TOKIO_RUNTIME is current_thread or multi_thread."),
+    };
+    let runtime = builder
+        .max_blocking_threads(BLOCKING_THREADS)
+        .enable_all()
+        .build()
+        .expect("the host runtime starts");
+    runtime.block_on(serve(config, perf_now));
+}
+async fn serve(config: config::Config, perf_now: Option<i64>) {
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("one TLS provider");
+    let _logs = edge::init_logs(&config.edge);
+    if let Some(perf_now) = perf_now {
+        tracing::warn!(perf_now, "PERF_NOW moved the clock");
+    }
+    let address = tokio::net::lookup_host((config.host.as_str(), config.port))
+        .await
+        .expect("HOST resolves")
+        .next()
+        .expect("HOST has an address");
+    let origin = config.server.app_url.clone();
+    let client_ip_header = config.server.client_ip_header.clone();
+    let rate_limit = config.server.rate_limit;
+    tracing::info!(enabled = rate_limit, "rate limits");
+    if !rate_limit {
+        tracing::warn!("rate limits are off");
+    }
+    // Before the listener starts, so no request writes during a migration.
+    if let Some(folder) = &config.migrations {
+        let mut db =
+            rusqlite::Connection::open(&config.server.database_path).expect("the database opens");
+        db.busy_timeout(std::time::Duration::from_secs(5))
+            .expect("busy timeout");
+        match snowtime_server::migrations::migrate(&mut db, folder) {
+            Ok(applied) => tracing::info!(applied, "migrations applied"),
+            Err(error) => panic!("Migrations failed: {error}"),
+        }
+    }
+    let app = snowtime_server::App::open_with_limits(
+        config.server,
+        config.read_connections,
+        config.limits,
+    )
+    .expect("the database opens");
+    let api = snowtime_server::router(app.clone());
+
+    let limit = memory::limit();
+    let cpus = std::thread::available_parallelism().map_or(1, |n| n.get());
+    let policy = memory::policy(&limit, cpus, config.renderers);
+    tracing::info!(
+        limit_mib = limit.bytes >> 20,
+        source = limit.source,
+        cpus,
+        renderers = policy.max_renderers,
+        heap_mib = policy.heap_limit_bytes >> 20,
+        semi_space_mib = policy.semi_space_bytes.map(|bytes| bytes >> 20),
+        "sized the renderers"
+    );
+    let pool = snowtime_render::Pool::start(
+        pages::in_process(api.clone(), client_ip_header.clone()),
+        snowtime_render::MANIFEST,
+        policy,
+    )
+    .expect("the renderer starts");
+    memory::watch(pool.clone(), limit.bytes);
+    #[cfg(feature = "bench")]
+    {
+        let pool = pool.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                let stats = pool.stats();
+                tracing::info!(renderers = stats.renderers, render_queued = stats.queued, render_busy_answers = stats.refused,
+                    database = %app.bench_stats(), "bench counters");
+            }
+        });
+    }
+    let health = health::routes(health::Lanes {
+        api: api.clone(),
+        pool: pool.clone(),
+    });
+    let pages = Router::new()
+        .fallback(pages::page)
+        .with_state(Arc::new(pages::Pages {
+            pool,
+            app_url: origin.clone(),
+            client_ip_header,
+        }));
+
+    let router = edge::router(api.merge(health), pages, &config.edge, &origin);
+    let handle = axum_server::Handle::new();
+    let shutdown_handle = handle.clone();
+    tokio::spawn(async move {
+        shutdown().await;
+        shutdown_handle.graceful_shutdown(Some(std::time::Duration::from_secs(10)));
+    });
+    let redirect = config.edge.redirect_port.map(|port| {
+        assert_ne!(port, config.port, "HTTP_REDIRECT_PORT differs from PORT");
+        let address = std::net::SocketAddr::new(address.ip(), port);
+        let handle = handle.clone();
+        let listener =
+            std::net::TcpListener::bind(address).expect("the HTTP redirect port is free");
+        listener
+            .set_nonblocking(true)
+            .expect("nonblocking redirect listener");
+        let edge = config.edge.clone();
+        tokio::spawn(async move {
+            edge::serve_redirects(listener, origin, &edge, handle)
+                .await
+                .expect("the HTTP redirect listener runs");
+        })
+    });
+    tracing::info!(%address, tls = !matches!(config.edge.tls, edge::Tls::Plain), "listening");
+    edge::serve(address, router, config.edge, handle)
+        .await
+        .expect("the server runs");
+    if let Some(task) = redirect {
+        task.abort();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn only_files_and_dns_use_the_blocking_pool() {
+        // Built at run time, so this file doesn't match itself.
+        let calls = [concat!("spawn", "_blocking"), concat!("block", "_in_place")];
+        fn check(path: &std::path::Path, calls: &[&str]) {
+            for entry in std::fs::read_dir(path).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    check(&path, calls);
+                } else if path.extension().is_some_and(|ext| ext == "rs") {
+                    let source = std::fs::read_to_string(&path).unwrap();
+                    for call in calls {
+                        assert!(!source.contains(call), "{call} in {}", path.display());
+                    }
+                }
+            }
+        }
+        check(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+            &calls,
+        );
+    }
+}

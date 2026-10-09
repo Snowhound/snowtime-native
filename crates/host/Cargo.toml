@@ -1,0 +1,55 @@
+[package]
+name = "snowtime-host"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "snowtime-axum"
+path = "src/main.rs"
+
+[features]
+bench = ["snowtime-server/bench", "snowtime-render/bench"]
+
+[dependencies]
+async-trait = "0.1"
+axum.workspace = true
+base64.workspace = true
+libc = "0.2"
+rand.workspace = true
+snowtime-render = { path = "../render" }
+snowtime-server.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+tokio.workspace = true
+axum-server = { version = "0.8", features = ["tls-rustls-no-provider"] }
+rustls = { version = "0.23", features = ["aws_lc_rs"] }
+rustls-acme = { version = "0.15", features = ["axum"] }
+tokio-stream = "0.1"
+http-body = "1"
+hyper-util = { version = "0.1", features = ["server-auto", "tokio"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.7", features = [
+  "catch-panic",
+  "compression-gzip",
+  "compression-zstd",
+  "fs",
+  "limit",
+  "timeout",
+] }
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["json"] }
+url = "2"
+percent-encoding = "2"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { workspace = true, features = ["test-util"] }
+rcgen = { version = "0.14", default-features = false, features = ["aws_lc_rs", "pem"] }
+tokio-rustls = "0.26"

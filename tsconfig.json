@@ -1,0 +1,15 @@
+{
+  // The harness, the adapter, and the port's conformance tests: TypeScript that imports the
+  // app's source by its ~/ alias and runs on the app's packages (node_modules links to
+  // app/node_modules).
+  "extends": "./app/tsconfig.json",
+  // harness/scaling drives the app's load harness with deploy/load/app.patch applied.
+  "include": ["adapter/**/*.ts", "adapter/*.tsx", "conformance/**/*.ts", "harness/**/*.ts"],
+  "exclude": ["**/node_modules", "harness/scaling"],
+  "compilerOptions": {
+    "types": ["vite/client", "bun"],
+    "paths": {
+      "~/*": ["./app/src/*"]
+    }
+  }
+}

@@ -1,0 +1,10 @@
+/target
+# node_modules at the root is a tracked link to app/node_modules; the adapter's own packages
+# install beside it.
+/adapter/node_modules/
+/adapter/dist/
+/adapter/bench/node_modules/
+/adapter/bench/dist/
+/crates/render/results/
+__pycache__/
+.DS_Store

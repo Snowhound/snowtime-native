@@ -1,0 +1,55 @@
+[package]
+name = "snowtime-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+bench = []
+scrypt-bench = ["dep:scrypt"]
+
+[dependencies]
+aws-lc-sys = "0.45"
+axum.workspace = true
+base64.workspace = true
+form_urlencoded.workspace = true
+governor = "0.10"
+hmac.workspace = true
+icu_collator.workspace = true
+icu_locale_core.workspace = true
+jiff.workspace = true
+libc = "0.2"
+openssl = { version = "0.10", features = ["vendored"] }
+rand.workspace = true
+regex = "1"
+reqwest = { version = "0.12.28", default-features = false, features = [
+  "rustls-tls-webpki-roots-no-provider",
+  "json",
+] }
+rusqlite.workspace = true
+rustc-hash.workspace = true
+scrypt = { workspace = true, optional = true }
+serde.workspace = true
+serde_cbor_2 = { version = "0.13" }
+serde_json = { workspace = true, features = ["raw_value"] }
+sha2.workspace = true
+tokio = { workspace = true, features = ["sync", "time"] }
+tower_governor = { version = "0.8", default-features = false, features = ["axum"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.7", features = ["catch-panic"] }
+unicode-normalization.workspace = true
+url = "2"
+uuid.workspace = true
+webauthn-rs-core = { version = "=0.5.5" }
+
+[dev-dependencies]
+rustls = { version = "0.23", features = ["aws_lc_rs"] }
+
+[[example]]
+name = "scrypt-bench"
+required-features = ["scrypt-bench"]

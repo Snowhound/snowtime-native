@@ -1,0 +1,1999 @@
+diff --git a/deploy/compose/bench/bench.caddy b/deploy/compose/bench/bench.caddy
+index 3816b0a..207d935 100644
+--- a/deploy/compose/bench/bench.caddy
++++ b/deploy/compose/bench/bench.caddy
+@@ -3,6 +3,7 @@
+ # sampler reads; the sampler's routes need the password whose bcrypt hash is in
+ # BENCH_SAMPLER_HASH.
+ log bench {
++	no_hostname
+ 	output file /var/log/caddy/access.log {
+ 		roll_disabled
+ 		# The sampler runs as nobody.
+@@ -30,6 +31,9 @@ log bench {
+ 	}
+ }
+ 
++@bench header X-Bench-Kind *
++log_name @bench bench
++
+ handle /_bench/* {
+ 	log_skip
+ 	basic_auth {
+diff --git a/deploy/compose/bench/litestream.yml b/deploy/compose/bench/litestream.yml
+new file mode 100644
+index 0000000..6f4e76a
+--- /dev/null
++++ b/deploy/compose/bench/litestream.yml
+@@ -0,0 +1,11 @@
++# The self-hosted replication cadence, with a local replica for the benchmark.
++addr: :9090
++dbs:
++  - path: /data/snowtime.db
++    replica:
++      type: file
++      path: /replica/snowtime
++      sync-interval: 1s
++snapshot:
++  interval: 24h
++  retention: 168h
+diff --git a/deploy/compose/compose.bench.direct.yml b/deploy/compose/compose.bench.direct.yml
+new file mode 100644
+index 0000000..750410d
+--- /dev/null
++++ b/deploy/compose/compose.bench.direct.yml
+@@ -0,0 +1,21 @@
++# Native TLS without reverse proxying. Caddy still exposes the sampler; k6 maps its
++# requests straight to app:3000. The private bench network trusts the generator's fake IPs.
++services:
++  app:
++    environment:
++      BETTER_AUTH_URL: https://snowtime-bench.test:3000
++      TLS_CERT_FILE: /tls/cert.pem
++      TLS_KEY_FILE: /tls/key.pem
++      EDGE_COMPRESSION: 'true'
++      EDGE_ACCESS_LOG: 'off'
++      EDGE_HEADERS: 'true'
++      EDGE_BENCH_LOG: /var/log/caddy/access.log
++    volumes:
++      - ${BENCH_DIRECT_TLS:?Set BENCH_DIRECT_TLS}:/tls:ro
++      - bench_log:/var/log/caddy
++    healthcheck:
++      test:
++        ['CMD', 'curl', '-kfsS', '-o', '/dev/null', 'https://localhost:3000/api/v1/availability']
++  sampler:
++    environment:
++      APP_URL: ''
+diff --git a/deploy/compose/compose.bench.edge.yml b/deploy/compose/compose.bench.edge.yml
+new file mode 100644
+index 0000000..c69e066
+--- /dev/null
++++ b/deploy/compose/compose.bench.edge.yml
+@@ -0,0 +1,6 @@
++# A Caddy JSON configuration for a measured edge variant (--caddy-config).
++services:
++  caddy:
++    command: ['caddy', 'run', '--config', '/etc/caddy/edge.json']
++    volumes:
++      - ${BENCH_CADDY_CONFIG:?Set BENCH_CADDY_CONFIG}:/etc/caddy/edge.json:ro
+diff --git a/deploy/compose/compose.bench.local.yml b/deploy/compose/compose.bench.local.yml
+index ea4a1e7..017ad97 100644
+--- a/deploy/compose/compose.bench.local.yml
++++ b/deploy/compose/compose.bench.local.yml
+@@ -10,7 +10,7 @@ services:
+     environment:
+       # --smol, for an A/B run (perf:stress --smol).
+       BUN_OPTIONS: ${BENCH_BUN_OPTIONS:-}
+-    cpuset: '1'
++    cpuset: '${BENCH_APP_CPUSET:-1}'
+     mem_limit: ${BENCH_APP_MEMORY:-1792m}
+     memswap_limit: ${BENCH_APP_MEMORY:-1792m}
+   caddy:
+@@ -29,8 +29,10 @@ services:
+         aliases:
+           - snowtime-bench.test
+   sampler:
++    ports:
++      - '127.0.0.1:${BENCH_SAMPLER_PORT:-19100}:9100'
+     image: snowtime-sampler:bench
+-    cpuset: '1'
++    cpuset: '${BENCH_SAMPLER_CPUSET:-1}'
+ volumes:
+   caddy_data:
+     name: snowtime_bench_caddy_data
+diff --git a/deploy/compose/compose.bench.native.yml b/deploy/compose/compose.bench.native.yml
+new file mode 100644
+index 0000000..640ecca
+--- /dev/null
++++ b/deploy/compose/compose.bench.native.yml
+@@ -0,0 +1,19 @@
++# The native backend (task 081) in the app's place on the local bench stack, with the same
++# database, limits, and environment. The host binary defaults to snowtime-axum;
++# NATIVE_BIN overrides it when building: perf:stress --app=native adds this file.
++services:
++  app:
++    image: snowtime-native:bench
++    environment:
++      EDGE_COMPRESSION: 'false'
++      EDGE_ACCESS_LOG: 'off'
++      EDGE_HEADERS: 'false'
++      DB_READ_CONNECTIONS: ${BENCH_READ_CONNECTIONS:-0}
++      TOKIO_RUNTIME: ${BENCH_TOKIO_RUNTIME:-multi_thread}
++      WORK_QUEUE_MAX_WAITING: ${BENCH_QUEUE_MAX_WAITING:-4096}
++      WORK_QUEUE_TIMEOUT_MS: ${BENCH_QUEUE_TIMEOUT_MS:-1000}
++      MIGRATIONS_DIR: /migrations
++    volumes:
++      - ../../drizzle:/migrations:ro
++    healthcheck:
++      test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://localhost:3000/api/v1/availability']
+diff --git a/deploy/compose/compose.bench.replication.yml b/deploy/compose/compose.bench.replication.yml
+new file mode 100644
+index 0000000..a5011fa
+--- /dev/null
++++ b/deploy/compose/compose.bench.replication.yml
+@@ -0,0 +1,16 @@
++services:
++  sampler:
++    environment:
++      LITESTREAM_URL: http://litestream:9090
++  litestream:
++    image: ${BENCH_LITESTREAM_IMAGE:-litestream/litestream:0.5.0}
++    user: '10001:10001'
++    command: ['replicate', '-config', '/etc/litestream.yml']
++    cpuset: '${BENCH_APP_CPUSET:-1}'
++    mem_limit: ${BENCH_LITESTREAM_MEMORY:-128m}
++    ports:
++      - '127.0.0.1:19090:9090'
++    volumes:
++      - app_data:/data
++      - ./bench/litestream.yml:/etc/litestream.yml:ro
++      - ${BENCH_REPLICA_DIR:?Set BENCH_REPLICA_DIR}:/replica
+diff --git a/perf/README.md b/perf/README.md
+index 87e9c6c..aef89a0 100644
+--- a/perf/README.md
++++ b/perf/README.md
+@@ -188,12 +188,77 @@ bun run perf:stress --recording=<file> --dataset=M --run=kinds
+ | `overload` | 2 minutes at `--users`, 5 at twice and four times that, 5 back at `--users`                                                                                |
+ 
+ `--no-build` skips the image builds and `--no-load` keeps the database in the bench
+-volume. `--step-seconds`, `--hold-seconds`, and `--from` adjust a ramp, and `--label` names its
++volume. `--step-seconds`, `--hold-seconds`, and `--from` adjust a ramp, and `--label`
++names its
+ results folder. A ramp `--from` a higher step first warms the app up for 30 s at half that
+ load, which it doesn't judge. `--recording=<file>` replays a recording from an earlier run
+ (its `recording.json`) instead of recording again; `kinds` then skips actions the file has no
+ requests for. `--caddy-cpuset=<cores>` moves Caddy off the app's core, such as to `0`.
+ 
++`--app-cpuset=<cores>` pins the app (default `1`), and
++`--k6-cpuset=<cores>` pins the local generator (default `2-9`). Keep these sets disjoint.
++`--sampler-cpuset=<cores>` moves the sampler (default `1`); Caddy has its existing
++`--caddy-cpuset` option. `--memory` limits the app, not the sum of the whole stack's
++memory limits. Record the combined app, proxy, and replication RSS separately.
++
++`--replica-dir=<absolute-or-relative-directory>` starts Litestream 0.5.0 alongside the
++app, pinned to its cores, with a default 128 MiB memory limit. Set
++`--litestream-memory=512m` to override that limit. The scaling driver reserves
++512 MiB for L after smaller limits caused startup OOM kills. The local-file replica uses the
++self-hosted config's one-second sync and daily snapshot cadence. Give container UID
++10001 write access to that directory. It contains benchmark data. The harness stops
++replication before replacing the dataset. Preserve its logs and replica with the run.
++Omitting the option stops any previous replication container. Use a fresh replica directory
++for each restored source dataset. `--warmup-seconds` waits before idle sampling (default
++30). Local replication runs warm with writes and wait for initial level-two compaction
++before measuring. `--litestream-image` selects a
++benchmark-only version override.
++
++`--read-connections=0|auto|<number>` configures the native pool. The sampler now records
++Litestream and k6 CPU, memory, swap, and thread counts separately. k6 counters are available
++while its container runs. CPU rates use adjacent samples from the same cgroup generation
++and report the observed duration. The harness stops when k6 uses more than 70% of its
++assigned-core budget and rejects dropped iterations. `--preallocated-vus` and `--max-vus`
++override the action-aware VU budgets. Local sampling uses a separate loopback HTTP port;
++`--sampler-url` overrides it, including for a remote SSH tunnel. Kind runs isolate page,
++API, and auth requests before measuring CPU; the timer action
++still alternates starts/stops. Each run saves settings,
++idle RSS, per-step requests/summaries/samples, images, and service logs. Ramps save
++`capacity.json`; a generator-limited ramp establishes no app capacity.
++
++`--dataset-date=YYYY-MM-DD` selects a preserved source database/users pair, even when
++selection-only harness edits change the current source fingerprint. It refuses ambiguous
++pairs and missing older dates. Pin it across a long matrix and retain file SHA-256 hashes.
++Without it, the harness retains its usual current-day generation behavior.
++
++Local worktrees share the Docker stack. A run reserves `/tmp/snowtime-perf-stress.lock`
++before touching it and releases the reservation on normal exit. If a run stops abruptly,
++verify that its owner and k6 have stopped before removing the stale directory. Sessions
++using an older checkout must also check for a running `perf:stress` or k6 process.
++
++For native-host TLS comparisons, `--direct` requires `--app=native` and a recording.
++Locally, it reuses the Caddy certificate and sends load straight to the host on port 3000.
++Run the normal stack first to create the certificate. Both modes share the same database,
++CPU limits, sampler, and complete access records. Local sampler traffic uses its separate
++loopback port; Caddy's idle overhead is instrumentation. Remote direct mode requires the
++native TLS
++listener on the configured origin; see
++snowtime-native's `harness/scaling/README.md`.
++
++For edge comparisons, `--caddy-config=<absolute-or-relative.json>` mounts an effective
++Caddy JSON configuration in place of the Caddyfile. Capture the running configuration
++with `docker exec snowtime-bench-caddy-1 wget -qO- http://127.0.0.1:2019/config/`.
++`bun perf/stress/edge-config.ts <source.json> <output.json> <variants...>` derives
++`single-log`, `sampled`, `no-log`, `h1`, and `no-encode` variants. `no-log` is diagnostic:
++it cannot validate the server's 30-second latency windows. CPU per request uses k6's
++request count, so disabling logging does not inflate the CPU result.
++
++`--encoding=gzip` or `--encoding=identity` sets the client's `Accept-Encoding` explicitly.
++k6 otherwise sends none for recordings that omit it. `--no-connection-reuse` measures
++fresh TLS connections. The summary records HTTP protocol counts and TLS handshake
++counts. Each step also saves its cgroup samples as `<step>.samples.json` so memory
++comparisons can distinguish RSS, anonymous memory, and the log's page cache.
++
+ Before the first step, a run waits 10 seconds and prints the app's idle memory, which it
+ also saves as `idle.txt` in the results folder.
+ 
+@@ -253,7 +318,8 @@ client and in Caddy's access log, and the target. Per container, from cgroup v2:
+ throttling, memory split into anonymous and page cache, disk traffic, and pressure (PSI).
+ The host's steal time, memory, and the database size follow, then whether the step held
+ its targets: server p95 under 300 ms for API calls, 1 s for pages and password
+-sign-in, and 3 s for the year report and export, in every 30-second window, with under 0.1% errors and no dropped
++sign-in, and 3 s for the year report and export, in every 30-second window, with under
++0.1% errors and no dropped
+ iterations. Results go to `perf/.cache/stress/runs/`.
+ 
+ The sampler (`perf/stress/sampler/`) reads cgroup files and Caddy's bench log once a
+@@ -295,17 +361,20 @@ saved to `perf/.cache/weather/` for comparison.
+ 
+ - Uncapped (`--disable-gpu-vsync --disable-frame-rate-limit`, renderer pacing off): frames
+   per second, the median and mean GPU time per frame (`EXT_disjoint_timer_query_webgl2`), and
+-  the median CPU time per frame. With two canvases, a frame's time is both contexts'. The page lets at most 64 frames queue on the GPU, since Chrome would
++  the median CPU time per frame. With two canvases, a frame's time is both contexts'. The
++  page lets at most 64 frames queue on the GPU, since Chrome would
+   otherwise accept thousands a second and stall later.
+ - Paced, as the app runs: frame rate, the weather's GPU milliseconds per second (`gpu/s`),
+-  and busy milliseconds per second on the page's main and compositor threads, the display compositor (viz), and the GPU process, from a trace.
++  and busy milliseconds per second on the page's main and compositor threads, the display
++  compositor (viz), and the GPU process, from a trace.
+   Then the GPU process's CPU time per second over all its threads (`proc`, from CDP's
+   `SystemInfo.getProcessInfo`), and on macOS the GPU's utilization (`use %`, the
+   IOAccelerator's "Device Utilization %"). Utilization counts every process on the machine,
+   so only large gaps between variants mean anything; `--window=<ms>` lengthens each
+   measured window (500 by default) to steady it.
+ - Timing draws each image's photo, since the glass shows a blurred copy of it
+-  (`docs/architecture/scene.md`, "Glass"). `--variant=live` blurs the surfaces live instead, as
++  (`docs/architecture/scene.md`, "Glass"). `--variant=live` blurs the surfaces live
++  instead, as
+   the app does before the copy is ready.
+ 
+ A case is a preset from `IMAGE_WEATHER` with the tuning fields that take other paths
+diff --git a/perf/stress/dataset.ts b/perf/stress/dataset.ts
+index e52a6e7..1fb6b7b 100644
+--- a/perf/stress/dataset.ts
++++ b/perf/stress/dataset.ts
+@@ -431,10 +431,26 @@ function datasetPaths(name: DatasetName, day = new Date().toISOString().slice(0,
+ 
+ // Returns the dataset's files, generating them first when today has none. Older files of the
+ // same dataset are removed.
+-export async function dataset(name: DatasetName) {
+-  const paths = datasetPaths(name)
+-  if (existsSync(paths.database) && existsSync(paths.users)) return paths
++export async function dataset(name: DatasetName, day?: string) {
++  if (day && !/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error('Dataset date is YYYY-MM-DD')
+   const folder = join(CACHE, 'stress')
++  if (day && existsSync(folder)) {
++    const preserved = readdirSync(folder).filter(
++      (file) =>
++        file.startsWith(`${name}-${day}-`) &&
++        file.endsWith('.db') &&
++        existsSync(join(folder, file.replace(/\.db$/, '.users.json'))),
++    )
++    if (preserved.length > 1) throw new Error(`Ambiguous preserved ${name} dataset for ${day}`)
++    if (preserved.length === 1) {
++      const database = join(folder, preserved[0])
++      return { database, users: database.replace(/\.db$/, '.users.json') }
++    }
++  }
++  const paths = datasetPaths(name, day)
++  if (existsSync(paths.database) && existsSync(paths.users)) return paths
++  if (day && day !== new Date().toISOString().slice(0, 10))
++    throw new Error(`No preserved ${name} dataset for ${day}; generate a fresh matched pair`)
+   mkdirSync(folder, { recursive: true })
+   for (const old of readdirSync(folder)) {
+     if (old.startsWith(`${name}-`)) rmSync(join(folder, old), { force: true })
+diff --git a/perf/stress/edge-config.ts b/perf/stress/edge-config.ts
+new file mode 100644
+index 0000000..c7e806a
+--- /dev/null
++++ b/perf/stress/edge-config.ts
+@@ -0,0 +1,46 @@
++// Derive one edge experiment from Caddy's effective JSON configuration.
++import { readFileSync, writeFileSync } from 'node:fs'
++
++const [source, destination, ...variants] = process.argv.slice(2)
++if (!source || !destination) {
++  throw new Error('Usage: bun perf/stress/edge-config.ts <source.json> <output.json> <variants...>')
++}
++const config = JSON.parse(readFileSync(source, 'utf8'))
++const server = config.apps.http.servers.srv0
++const host = Object.keys(server.logs.logger_names)[0]
++
++function removeEncode(value: unknown) {
++  if (Array.isArray(value)) {
++    value.forEach(removeEncode)
++  } else if (value && typeof value === 'object') {
++    const node = value as Record<string, unknown>
++    if (Array.isArray(node.handle)) {
++      node.handle = node.handle.filter((handler) => handler.handler !== 'encode')
++    }
++    Object.values(node).forEach(removeEncode)
++  }
++}
++
++for (const variant of variants) {
++  switch (variant) {
++    case 'single-log':
++      server.logs.logger_names[host] = ['bench']
++      break
++    case 'sampled':
++      config.logging.logs.log0.sampling = { interval: 1_000_000_000, first: 10, thereafter: 100 }
++      break
++    case 'no-log':
++      delete server.logs.logger_names[host]
++      server.logs.skip_hosts = [host]
++      break
++    case 'h1':
++      server.protocols = ['h1']
++      break
++    case 'no-encode':
++      removeEncode(config)
++      break
++    default:
++      throw new Error(`Unknown edge variant: ${variant}`)
++  }
++}
++writeFileSync(destination, JSON.stringify(config, null, 2))
+diff --git a/perf/stress/lock.test.ts b/perf/stress/lock.test.ts
+new file mode 100644
+index 0000000..4d61e39
+--- /dev/null
++++ b/perf/stress/lock.test.ts
+@@ -0,0 +1,23 @@
++import { expect, test } from 'bun:test'
++import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
++import { tmpdir } from 'node:os'
++import { join } from 'node:path'
++import { reserveStack } from './lock'
++
++test('a second worktree cannot acquire or clear the active reservation', () => {
++  const parent = mkdtempSync(join(tmpdir(), 'stress-lock-test-'))
++  const directory = join(parent, 'lock')
++  try {
++    const release = reserveStack(directory)
++    const owner = readFileSync(join(directory, 'owner'), 'utf8')
++    expect(() => reserveStack(directory)).toThrow('Another session reserved the stack')
++    expect(readFileSync(join(directory, 'owner'), 'utf8')).toBe(owner)
++    release()
++    const releaseNext = reserveStack(directory)
++    release()
++    expect(() => reserveStack(directory)).toThrow('Another session reserved the stack')
++    releaseNext()
++  } finally {
++    rmSync(parent, { recursive: true, force: true })
++  }
++})
+diff --git a/perf/stress/lock.ts b/perf/stress/lock.ts
+new file mode 100644
+index 0000000..4bb9d07
+--- /dev/null
++++ b/perf/stress/lock.ts
+@@ -0,0 +1,58 @@
++import { spawnSync } from 'node:child_process'
++import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
++import { join } from 'node:path'
++
++// All local worktrees use the same Docker stack and must serialize their runs.
++const DIRECTORY = '/tmp/snowtime-perf-stress.lock'
++
++export function checkOtherSessions() {
++  const result = spawnSync('ps', ['-axo', 'pid=,ppid=,command='], { encoding: 'utf8' })
++  if (result.status !== 0) throw new Error('[stress] Cannot check other benchmark sessions.')
++  const processes = result.stdout.split('\n').flatMap((line) => {
++    const match = line.match(/^\s*(\d+)\s+(\d+)\s+(\S.*)$/)
++    return match ? [{ pid: Number(match[1]), parent: Number(match[2]), command: match[3] }] : []
++  })
++  const ancestors = new Set<number>()
++  let pid = process.pid
++  while (pid && !ancestors.has(pid)) {
++    ancestors.add(pid)
++    pid = processes.find((entry) => entry.pid === pid)?.parent ?? 0
++  }
++  const other = processes.find(
++    (entry) =>
++      !ancestors.has(entry.pid) &&
++      /^(?:\S*\/)?(?:bun|k6|docker)\s/.test(entry.command) &&
++      /perf:stress|perf\/stress\/stress\.ts|(?:^|\/)k6 run|grafana\/k6/.test(entry.command),
++  )
++  if (other)
++    throw new Error(
++      `[stress] Another benchmark session is running: pid=${other.pid} ${other.command}`,
++    )
++}
++
++export function reserveStack(directory = DIRECTORY): () => void {
++  try {
++    mkdirSync(directory)
++  } catch (error) {
++    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
++    let owner = 'unknown owner'
++    try {
++      owner = readFileSync(join(directory, 'owner'), 'utf8').trim()
++    } catch {
++      // The other process may not have written its owner metadata yet.
++    }
++    throw new Error(
++      `[stress] Another session reserved the stack: ${owner}. ` +
++        `After verifying it stopped, remove ${directory} to clear a stale reservation.`,
++      { cause: error },
++    )
++  }
++  writeFileSync(join(directory, 'owner'), `pid=${process.pid} cwd=${process.cwd()}\n`)
++  let released = false
++  function release() {
++    if (released) return
++    released = true
++    rmSync(directory, { recursive: true, force: true })
++  }
++  return release
++}
+diff --git a/perf/stress/metrics.test.ts b/perf/stress/metrics.test.ts
+new file mode 100644
+index 0000000..8db631a
+--- /dev/null
++++ b/perf/stress/metrics.test.ts
+@@ -0,0 +1,27 @@
++import { expect, test } from 'bun:test'
++import { droppedActions } from './metrics'
++
++test('rejects the observed pilot with global drops and an empty custom-step counter', () => {
++  expect(
++    droppedActions(
++      {
++        dropped_iterations: { values: { count: 56 } },
++        'dropped_iterations{step:reports}': { values: { count: 0 } },
++      },
++      'reports',
++    ),
++  ).toBe(56)
++})
++
++test('detects scenario drops when the global counter is absent', () => {
++  expect(
++    droppedActions(
++      {
++        'dropped_iterations{scenario:reports}': { values: { count: 7 } },
++        'dropped_iterations{step:reports}': { values: { count: 0 } },
++      },
++      'reports',
++    ),
++  ).toBe(7)
++  expect(droppedActions({}, 'reports')).toBe(0)
++})
+diff --git a/perf/stress/metrics.ts b/perf/stress/metrics.ts
+new file mode 100644
+index 0000000..912d90d
+--- /dev/null
++++ b/perf/stress/metrics.ts
+@@ -0,0 +1,9 @@
++type Counters = Record<string, { values: Record<string, number> }>
++
++export function droppedActions(metrics: Counters, step: string): number {
++  return Math.max(
++    metrics[`dropped_iterations{step:${step}}`]?.values.count ?? 0,
++    metrics[`dropped_iterations{scenario:${step}}`]?.values.count ?? 0,
++    metrics.dropped_iterations?.values.count ?? 0,
++  )
++}
+diff --git a/perf/stress/sampler/main.go b/perf/stress/sampler/main.go
+index ced43e7..edb133e 100644
+--- a/perf/stress/sampler/main.go
++++ b/perf/stress/sampler/main.go
+@@ -15,6 +15,7 @@ package main
+ 
+ import (
+ 	"bufio"
++	"encoding/binary"
+ 	"encoding/json"
+ 	"io"
+ 	"log"
+@@ -31,21 +32,24 @@ import (
+ const keep = 4 * 60 * 60
+ 
+ // Processes by their command name (comm, at most 15 characters).
+-var watched = map[string]string{"snowtime": "app", "caddy": "caddy"}
++var watched = map[string]string{"snowtime": "app", "caddy": "caddy", "k6": "k6", "litestream": "litestream"}
+ 
+ type Container struct {
+-	CPUUsec       int64 `json:"cpuUsec"`
+-	UserUsec      int64 `json:"userUsec"`
+-	SystemUsec    int64 `json:"systemUsec"`
+-	Throttled     int64 `json:"throttled"`
+-	ThrottledUsec int64 `json:"throttledUsec"`
+-	Memory        int64 `json:"memory"`
+-	MemoryPeak    int64 `json:"memoryPeak"`
+-	Anon          int64 `json:"anon"`
+-	File          int64 `json:"file"`
+-	ReadBytes     int64 `json:"readBytes"`
+-	WriteBytes    int64 `json:"writeBytes"`
+-	OOMKills      int64 `json:"oomKills"`
++	Generation    string `json:"generation"`
++	PID           int    `json:"pid"`
++	CPUUsec       int64  `json:"cpuUsec"`
++	UserUsec      int64  `json:"userUsec"`
++	SystemUsec    int64  `json:"systemUsec"`
++	Throttled     int64  `json:"throttled"`
++	ThrottledUsec int64  `json:"throttledUsec"`
++	Memory        int64  `json:"memory"`
++	MemoryPeak    int64  `json:"memoryPeak"`
++	Swap          int64  `json:"swap"`
++	Anon          int64  `json:"anon"`
++	File          int64  `json:"file"`
++	ReadBytes     int64  `json:"readBytes"`
++	WriteBytes    int64  `json:"writeBytes"`
++	OOMKills      int64  `json:"oomKills"`
+ 	// Pressure stall totals in microseconds: some, and for memory and IO also full.
+ 	CPUSome    int64 `json:"cpuSome"`
+ 	MemorySome int64 `json:"memorySome"`
+@@ -53,7 +57,8 @@ type Container struct {
+ 	IOSome     int64 `json:"ioSome"`
+ 	IOFull     int64 `json:"ioFull"`
+ 	// The main process's resident memory, from /proc/<pid>/status.
+-	RSS int64 `json:"rss"`
++	RSS     int64 `json:"rss"`
++	Threads int64 `json:"threads"`
+ }
+ 
+ type Sample struct {
+@@ -67,8 +72,10 @@ type Sample struct {
+ 	Files        map[string]int64      `json:"files"`
+ 	Containers   map[string]*Container `json:"containers"`
+ 	// The sampler's own time spent reading, in microseconds.
+-	ReadUsec int64 `json:"readUsec"`
+-	Heap     *Heap `json:"heap,omitempty"`
++	ReadUsec   int64             `json:"readUsec"`
++	Heap       *Heap             `json:"heap,omitempty"`
++	WAL        map[string]uint32 `json:"wal,omitempty"`
++	Litestream string            `json:"litestreamMetrics,omitempty"`
+ }
+ 
+ // The app's process.memoryUsage(), in bytes, and how long it took to answer. An answer that
+@@ -110,11 +117,9 @@ func env(key, fallback string) string {
+ func main() {
+ 	go func() {
+ 		next := time.Now().Truncate(time.Second)
+-		for i := 0; ; i++ {
+-			// Processes restart, so the cgroups are looked up again every 10 seconds.
+-			if i%10 == 0 {
+-				findGroups()
+-			}
++		for {
++			// Discover short-lived generator processes on each sample.
++			findGroups()
+ 			next = next.Add(time.Second)
+ 			time.Sleep(time.Until(next))
+ 			sample := read()
+@@ -199,12 +204,28 @@ func read() Sample {
+ 	mu.Unlock()
+ 	for name, g := range current {
+ 		if g.path != "" {
+-			sample.Containers[name] = container(g)
++			if value := container(g); value != nil {
++				sample.Containers[name] = value
++			}
+ 		}
+ 	}
+ 	if appURL != "" {
+ 		sample.Heap = heap()
+ 	}
++	if data, err := os.ReadFile(filepath.Join(dataDir, "snowtime.db-shm")); err == nil && len(data) >= 136 {
++		sample.WAL = map[string]uint32{
++			"liveFrames":                binary.LittleEndian.Uint32(data[16:20]),
++			"checkpointedFrames":        binary.LittleEndian.Uint32(data[96:100]),
++			"checkpointAttemptedFrames": binary.LittleEndian.Uint32(data[128:132]),
++		}
++	}
++	if endpoint := os.Getenv("LITESTREAM_URL"); endpoint != "" {
++		if response, err := client.Get(endpoint + "/metrics"); err == nil {
++			data, _ := io.ReadAll(io.LimitReader(response.Body, 128<<10))
++			response.Body.Close()
++			sample.Litestream = string(data)
++		}
++	}
+ 	var after syscall.Rusage
+ 	syscall.Getrusage(syscall.RUSAGE_SELF, &after)
+ 	sample.ReadUsec = usec(after.Utime) + usec(after.Stime) - usec(self.Utime) - usec(self.Stime)
+@@ -227,9 +248,13 @@ func usec(t syscall.Timeval) int64 { return t.Sec*1_000_000 + int64(t.Usec) }
+ 
+ func container(g group) *Container {
+ 	cpu := keyed(filepath.Join(g.path, "cpu.stat"))
++	if _, live := cpu["usage_usec"]; !live {
++		return nil
++	}
+ 	memory := keyed(filepath.Join(g.path, "memory.stat"))
+ 	events := keyed(filepath.Join(g.path, "memory.events"))
+ 	c := &Container{
++		Generation: g.path, PID: g.pid,
+ 		CPUUsec:       cpu["usage_usec"],
+ 		UserUsec:      cpu["user_usec"],
+ 		SystemUsec:    cpu["system_usec"],
+@@ -237,9 +262,11 @@ func container(g group) *Container {
+ 		ThrottledUsec: cpu["throttled_usec"],
+ 		Memory:        number(filepath.Join(g.path, "memory.current")),
+ 		MemoryPeak:    number(filepath.Join(g.path, "memory.peak")),
++		Swap:          number(filepath.Join(g.path, "memory.swap.current")),
+ 		Anon:          memory["anon"],
+ 		File:          memory["file"],
+ 		OOMKills:      events["oom_kill"],
++		Threads:       keyed(filepath.Join("/proc", strconv.Itoa(g.pid), "status"))["Threads"],
+ 		RSS:           keyed(filepath.Join("/proc", strconv.Itoa(g.pid), "status"))["VmRSS"] * 1024,
+ 	}
+ 	c.ReadBytes, c.WriteBytes = ioBytes(filepath.Join(g.path, "io.stat"))
+@@ -348,7 +375,9 @@ type Request struct {
+ }
+ 
+ type logLine struct {
+-	Time    float64 `json:"ts"`
++	Fields  RequestFields `json:"fields"`
++	Target  string        `json:"target"`
++	Time    float64       `json:"ts"`
+ 	Request struct {
+ 		Headers map[string][]string `json:"headers"`
+ 	} `json:"request"`
+@@ -357,6 +386,35 @@ type logLine struct {
+ 	Status   int     `json:"status"`
+ }
+ 
++type RequestFields struct {
++	Kind     string  `json:"kind"`
++	Step     string  `json:"step"`
++	Time     float64 `json:"ts"`
++	Duration float64 `json:"duration"`
++	Size     int64   `json:"size"`
++	Status   int     `json:"status"`
++}
++
++func requestFromLine(line []byte) (Request, bool) {
++	var entry logLine
++	if json.Unmarshal(line, &entry) != nil {
++		return Request{}, false
++	}
++	if entry.Target == "snowtime_bench" {
++		f := entry.Fields
++		return Request{f.Time, f.Kind, f.Step, f.Status, f.Duration, f.Size}, f.Kind != ""
++	}
++	kind := entry.Request.Headers["X-Bench-Kind"]
++	if len(kind) == 0 {
++		return Request{}, false
++	}
++	request := Request{entry.Time, kind[0], "", entry.Status, entry.Duration, entry.Size}
++	if step := entry.Request.Headers["X-Bench-Step"]; len(step) > 0 {
++		request.Step = step[0]
++	}
++	return request, true
++}
++
+ // Whole lines from offset on, at most 64 MB at a time; the response says where to go on and
+ // whether more is there.
+ func serveLog(w http.ResponseWriter, r *http.Request) {
+@@ -390,19 +448,10 @@ func serveLog(w http.ResponseWriter, r *http.Request) {
+ 			break
+ 		}
+ 		offset += int64(len(line))
+-		var entry logLine
+-		if json.Unmarshal(line, &entry) != nil {
+-			continue
+-		}
+-		kind := entry.Request.Headers["X-Bench-Kind"]
+-		if len(kind) == 0 {
++		request, ok := requestFromLine(line)
++		if !ok {
+ 			continue
+ 		}
+-		step := entry.Request.Headers["X-Bench-Step"]
+-		request := Request{entry.Time, kind[0], "", entry.Status, entry.Duration, entry.Size}
+-		if len(step) > 0 {
+-			request.Step = step[0]
+-		}
+ 		requests = append(requests, request)
+ 	}
+ 	w.Header().Set("Content-Type", "application/json")
+diff --git a/perf/stress/sampler/main_test.go b/perf/stress/sampler/main_test.go
+new file mode 100644
+index 0000000..6338ffe
+--- /dev/null
++++ b/perf/stress/sampler/main_test.go
+@@ -0,0 +1,21 @@
++package main
++
++import "testing"
++
++func TestRequestFormats(t *testing.T) {
++	for _, line := range []string{
++		`{"ts":1,"status":200,"duration":0.02,"size":42,"request":{"headers":{"X-Bench-Kind":["return"],"X-Bench-Step":["fixed"]}}}`,
++		`{"target":"snowtime_bench","fields":{"ts":1,"kind":"return","step":"fixed","status":200,"duration":0.02,"size":42}}`,
++	} {
++		got, ok := requestFromLine([]byte(line))
++		want := Request{1, "return", "fixed", 200, 0.02, 42}
++		if !ok || got != want {
++			t.Fatalf("got %+v (%v), want %+v", got, ok, want)
++		}
++	}
++	for _, line := range []string{`invalid`, `{}`, `{"target":"snowtime_bench","fields":{"status":200,"kind":""}}`} {
++		if _, ok := requestFromLine([]byte(line)); ok {
++			t.Fatalf("unexpected request: %s", line)
++		}
++	}
++}
+diff --git a/perf/stress/scenario.js b/perf/stress/scenario.js
+index 0342983..46eeb73 100644
+--- a/perf/stress/scenario.js
++++ b/perf/stress/scenario.js
+@@ -17,6 +17,27 @@ import exec from 'k6/execution'
+ import http from 'k6/http'
+ import { Counter, Trend } from 'k6/metrics'
+ 
++const handshakes = new Counter('bench_tls_handshakes')
++const protocols = new Counter('bench_protocols')
++const serverTiming = new Trend('bench_server_timing', true)
++const TIMINGS =
++  __ENV.LANE_BENCH === '1'
++    ? ['admission', 'cpu', 'scrypt_cpu', 'render_queue']
++    : [
++        'admission',
++        'connection_wait',
++        'connection_hold',
++        'cpu',
++        'scrypt_cpu',
++        'blocking_cpu',
++        'blocking_queue',
++        'render_queue',
++        'render_cpu',
++        'render',
++        'session',
++        'db',
++      ]
++
+ const ORIGIN = __ENV.ORIGIN
+ const HOST = ORIGIN.replace(/^https:\/\//, '')
+ const SECRET = __ENV.SECRET
+@@ -43,13 +64,35 @@ const MIX = [
+ const ACTIONS_PER_HOUR = MIX.reduce((total, [, times]) => total + times, 0)
+ 
+ const users = new SharedArray('users', () => JSON.parse(open(__ENV.USERS)))
++const selections = new Map(
++  PLAN.filter((step) => step.userId || step.organization || step.excludeOrganization).map(
++    (step) => [
++      step.name,
++      new SharedArray(`selection:${step.name}`, () => {
++        const all = JSON.parse(open(__ENV.USERS))
++        return all.flatMap((user, index) => {
++          const selected = step.userId
++            ? user.userId === step.userId
++            : step.organization
++              ? user.organizationId === step.organization
++              : user.organizationId !== step.excludeOrganization
++          return selected ? [index] : []
++        })
++      }),
++    ],
++  ),
++)
+ const recording = JSON.parse(open(__ENV.RECORDING))
+ 
+ const errors = new Counter('bench_errors')
++const statuses = new Counter('bench_statuses')
++const retryAfter = new Counter('bench_retry_after')
++const callDuration = new Trend('bench_call_duration', true)
+ const actionDuration = new Trend('bench_action_duration', true)
+ 
+ // A request's kind: the action and what it asks for, as the result tables group them.
+ function kindOf(action, request) {
++  action = action.split(':')[0]
+   if (isCall(request)) return `${action} api`
+   if (request.path.startsWith('/api/auth/')) return `${action} auth`
+   return `${action} page`
+@@ -74,9 +117,27 @@ for (const step of PLAN) {
+   for (const kind of KINDS) {
+     thresholds[`http_req_duration{step:${step.name},kind:${kind}}`] = ['max>=0']
+     thresholds[`http_reqs{step:${step.name},kind:${kind}}`] = ['count>=0']
++    for (const timing of TIMINGS)
++      thresholds[`bench_server_timing{step:${step.name},kind:${kind},timing:${timing}}`] = [
++        'max>=0',
++      ]
++  }
++  for (const [action, requests] of Object.entries(recording.actions)) {
++    for (const request of requests) {
++      const kind = kindOf(action, request),
++        call = `${request.method} ${request.path.split('?')[0]}`
++      thresholds[`bench_call_duration{step:${step.name},kind:${kind},call:${call}}`] = ['max>=0']
++      for (const status of [200, 503])
++        thresholds[`bench_statuses{step:${step.name},kind:${kind},call:${call},status:${status}}`] =
++          ['count>=0']
++    }
+   }
++  for (const status of [200, 503, 429])
++    thresholds[`bench_statuses{step:${step.name},status:${status}}`] = ['count>=0']
++  thresholds[`bench_retry_after{step:${step.name}}`] = ['count>=0']
+   thresholds[`http_reqs{step:${step.name}}`] = ['count>=0']
+   thresholds[`dropped_iterations{step:${step.name}}`] = ['count>=0']
++  thresholds[`dropped_iterations{scenario:${step.name}}`] = ['count>=0']
+   thresholds[`bench_action_duration{step:${step.name}}`] = ['max>=0']
+   for (const type of ['5xx', '429', '4xx', 'connection', 'timeout']) {
+     thresholds[`bench_errors{step:${step.name},type:${type}}`] = ['count>=0']
+@@ -87,30 +148,51 @@ let start = 0
+ const scenarios = {}
+ for (const step of PLAN) {
+   const perHour = Math.max(1, Math.round(step.perHour ?? step.users * ACTIONS_PER_HOUR))
+-  // Enough virtual users for every action to wait 30 s at the planned rate.
+-  const concurrent = Math.ceil((perHour / 3600) * 30) + 10
++  // An action can contain several sequential requests, each with its own timeout.
++  const groups = Math.max(
++    ...Object.values(recording.actions).map((requests) => {
++      let count = 0,
++        batch = false
++      for (const request of requests) {
++        const read = request.method === 'GET' && isCall(request)
++        if (!read || !batch) count++
++        batch = read
++      }
++      return count
++    }),
++  )
++  const concurrent = Number(__ENV.MAX_VUS) || Math.ceil((perHour / 3600) * 30 * groups) + 20
+   scenarios[step.name] = {
+     executor: 'constant-arrival-rate',
+     rate: perHour,
+     timeUnit: '1h',
+     duration: `${step.seconds}s`,
+-    startTime: `${start}s`,
+-    preAllocatedVUs: Math.min(concurrent, 50),
++    startTime: `${step.start ?? start}s`,
++    preAllocatedVUs: Math.min(
++      concurrent,
++      Number(__ENV.PREALLOCATED_VUS) ||
++        Math.max(50, Math.min(500, Math.ceil((perHour / 3600) * 2))),
++    ),
+     maxVUs: concurrent,
+     gracefulStop: '30s',
+     exec: 'act',
+     tags: { step: step.name },
+   }
+-  start += step.seconds
++  start = Math.max(start, (step.start ?? start) + step.seconds)
+ }
+ 
+ export const options = {
+   scenarios,
+-  thresholds,
++  thresholds: {
++    ...thresholds,
++    'bench_protocols{protocol:HTTP/1.1}': [],
++    'bench_protocols{protocol:HTTP/2.0}': [],
++  },
+   hosts: __ENV.HOST_IP ? { [HOST]: __ENV.HOST_IP } : {},
+   insecureSkipTLSVerify: __ENV.INSECURE === '1',
+   summaryTrendStats: ['avg', 'med', 'p(95)', 'p(99)', 'max', 'count'],
+   discardResponseBodies: true,
++  noConnectionReuse: __ENV.NO_CONNECTION_REUSE === '1',
+   userAgent: 'snowtime-bench (k6)',
+ }
+ 
+@@ -162,9 +244,13 @@ function classify(response) {
+ 
+ export function act() {
+   const step = exec.scenario.name
+-  const index = Math.floor(Math.random() * users.length)
++  const selection = PLAN.find((s) => s.name === step)
++  const candidates = selections.get(step)
++  const index = candidates
++    ? candidates[Math.floor(Math.random() * candidates.length)]
++    : Math.floor(Math.random() * users.length)
+   const user = users[index]
+-  let action = PLAN.find((s) => s.name === step).action ?? pickAction()
++  let action = selection.action ?? pickAction()
+   const fresh = {}
+   if (action === 'timer') {
+     const running = started.get(index)
+@@ -178,7 +264,7 @@ export function act() {
+       started.set(index, fresh[0])
+     }
+   }
+-  const signedIn = action !== 'sign-in'
++  const signedIn = action !== 'sign-in' && action !== 'sign-in:auth'
+   const jar = new http.CookieJar()
+   // Without it, a page answers a user whose language isn't English with a redirect.
+   jar.set(ORIGIN, LOCALE_COOKIE, user.locale)
+@@ -199,6 +285,7 @@ export function act() {
+       redirects: 0,
+       headers: {
+         ...request.headers,
++        ...(__ENV.ENCODING && { 'Accept-Encoding': __ENV.ENCODING }),
+         Origin: ORIGIN,
+         'CF-Connecting-IP': ip,
+         'X-Bench-Kind': kind,
+@@ -212,6 +299,19 @@ export function act() {
+   }
+ 
+   function check(response, request) {
++    statuses.add(1, { status: response.status, kind: kindOf(action, request), call: request.call })
++    if (response.status === 503 && response.headers['Retry-After'] === '1') retryAfter.add(1)
++    callDuration.add(response.timings.duration, {
++      kind: kindOf(action, request),
++      call: request.call,
++    })
++    protocols.add(1, { protocol: response.proto })
++    for (const part of (response.headers['Server-Timing'] ?? '').split(',')) {
++      const match = part.trim().match(/^([a-z_]+);dur=([\d.]+)/)
++      if (match)
++        serverTiming.add(Number(match[2]), { kind: kindOf(action, request), timing: match[1] })
++    }
++    if (response.timings.tls_handshaking > 0) handshakes.add(1)
+     if (action === 'stop' && request.method === 'POST' && response.status === 404) return
+     const type = classify(response)
+     if (type) errors.add(1, { type, kind: kindOf(action, request) })
+@@ -221,6 +321,7 @@ export function act() {
+   // browser's refetches do.
+   const requests = recording.actions[action].map((r) => ({
+     ...r,
++    call: `${r.method} ${r.path.split('?')[0]}`,
+     path: fill(r.path, user, fresh),
+     body: r.body && fill(r.body, user, fresh).replace('snowtime-local', PASSWORD),
+   }))
+diff --git a/perf/stress/stack.ts b/perf/stress/stack.ts
+index dfed44e..79e399a 100644
+--- a/perf/stress/stack.ts
++++ b/perf/stress/stack.ts
+@@ -3,6 +3,7 @@
+ // (perf/README.md, "Load benchmark").
+ 
+ import { spawnSync } from 'node:child_process'
++import { mkdirSync } from 'node:fs'
+ import { basename, dirname, join } from 'node:path'
+ import { ROOT } from '../lib/database'
+ 
+@@ -27,6 +28,15 @@ function run(command: string, args: string[], options: { env?: Record<string, st
+   if (result.status !== 0) throw new Error(`[stress] ${command} ${args.join(' ')} failed`)
+ }
+ 
++// Which backend runs as the app: the TypeScript release image, or the native backend of task
++// 081 (snowtime-native's deploy/Dockerfile), which compose.bench.native.yml puts in its place.
++export type App = 'ts' | 'native'
++let app: App = 'ts'
++
++export function useApp(next: App) {
++  app = next
++}
++
+ export function compose(args: string[], env: Record<string, string> = {}) {
+   run(
+     'docker',
+@@ -38,6 +48,10 @@ export function compose(args: string[], env: Record<string, string> = {}) {
+       'compose.bench.yml',
+       '-f',
+       'compose.bench.local.yml',
++      ...(app === 'native' ? ['-f', 'compose.bench.native.yml'] : []),
++      ...(env.BENCH_DIRECT_TLS ? ['-f', 'compose.bench.direct.yml'] : []),
++      ...(env.BENCH_REPLICA_DIR ? ['-f', 'compose.bench.replication.yml'] : []),
++      ...(env.BENCH_CADDY_CONFIG ? ['-f', 'compose.bench.edge.yml'] : []),
+       ...args,
+     ],
+     {
+@@ -55,16 +69,35 @@ export function compose(args: string[], env: Record<string, string> = {}) {
+ }
+ 
+ // Builds the three images natively; Docker's cache makes a rebuild of unchanged code quick.
++// The native image builds from snowtime-native, the repository this app is a submodule of
++// (NATIVE_PORT overrides it). NATIVE_BIN picks the host binary (snowtime-axum by default);
++// its render bundle must be built first (snowtime-native's README.md, "Server rendering").
+ export function buildImages() {
+-  for (const target of ['app', 'caddy', 'sampler']) {
++  for (const target of app === 'native' ? ['caddy', 'sampler'] : ['app', 'caddy', 'sampler']) {
+     run('docker', ['build', '--target', target, '-t', `snowtime-${target}:bench`, ROOT])
+   }
++  if (app === 'native') {
++    const bin = process.env.NATIVE_BIN ?? 'snowtime-axum'
++    const native = process.env.NATIVE_PORT ?? join(ROOT, '..')
++    run('docker', [
++      'build',
++      '-f',
++      join(native, 'deploy/Dockerfile'),
++      '--build-arg',
++      `BIN=${bin}`,
++      '--build-arg',
++      `CARGO_FEATURES=${process.env.NATIVE_FEATURES ?? ''}`,
++      '-t',
++      'snowtime-native:bench',
++      native,
++    ])
++  }
+ }
+ 
+ // Replaces the bench volume's database with the dataset, while the app is stopped, and drops
+ // the page cache, so the run starts as a server would after a restart: from the disk.
+-export function loadDataset(database: string) {
+-  compose(['stop', 'app'])
++export function loadDataset(database: string, settings: Record<string, string> = {}) {
++  compose(['stop', 'app', ...(settings.BENCH_REPLICA_DIR ? ['litestream'] : [])], settings)
+   run('docker', [
+     'run',
+     '--rm',
+@@ -75,7 +108,7 @@ export function loadDataset(database: string) {
+     'alpine',
+     'sh',
+     '-c',
+-    `rm -f /data/snowtime.db /data/snowtime.db-* && cp /source/${basename(database)} /data/snowtime.db && chown -R 10001:10001 /data`,
++    `rm -f /data/snowtime.db /data/snowtime.db-* && rm -rf /data/.snowtime.db-litestream && cp /source/${basename(database)} /data/snowtime.db && chown -R 10001:10001 /data`,
+   ])
+   dropCaches()
+ }
+@@ -94,6 +127,60 @@ function dropCaches() {
+ 
+ // Starts the stack, or recreates its containers with changed settings, such as a memory
+ // limit, and waits until the app is healthy.
+-export function startStack(env: Record<string, string> = {}) {
+-  compose(['up', '-d', '--wait', '--force-recreate'], env)
++export function startStack(env: Record<string, string> = {}, retainReplication = false) {
++  if (retainReplication)
++    run('docker', ['update', '--cpuset-cpus', env.BENCH_APP_CPUSET, 'snowtime-bench-litestream-1'])
++  compose(
++    [
++      'up',
++      '-d',
++      '--wait',
++      '--force-recreate',
++      ...(retainReplication ? ['app', 'caddy', 'sampler'] : []),
++    ],
++    env,
++  )
++}
++
++// Reuse the benchmark's certificate so both edges serve the same hostname and key.
++export function directTls(directory: string) {
++  mkdirSync(directory, { recursive: true })
++  run('docker', [
++    'run',
++    '--rm',
++    '-v',
++    'snowtime_bench_caddy_data:/source:ro',
++    '-v',
++    `${directory}:/target`,
++    'alpine',
++    'sh',
++    '-c',
++    'cp /source/caddy/certificates/local/snowtime-bench.test/snowtime-bench.test.crt /target/cert.pem && cp /source/caddy/certificates/local/snowtime-bench.test/snowtime-bench.test.key /target/key.pem && chown -R 10001:10001 /target && chmod 700 /target && chmod 600 /target/*',
++  ])
++  run('docker', [
++    'run',
++    '--rm',
++    '-v',
++    'snowtime-bench_bench_log:/logs',
++    'alpine',
++    'sh',
++    '-c',
++    'touch /logs/access.log && chown -R 10001:10001 /logs',
++  ])
++}
++
++export function directAddress(): string {
++  const result = spawnSync(
++    'docker',
++    [
++      'inspect',
++      '-f',
++      '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}',
++      'snowtime-bench-app-1',
++    ],
++    { encoding: 'utf8' },
++  )
++  if (result.status !== 0 || !result.stdout.trim())
++    throw new Error('[stress] No native container address')
++  return `${result.stdout.trim()}:3000`
+ }
+diff --git a/perf/stress/stress.ts b/perf/stress/stress.ts
+index 3de4136..44147f2 100644
+--- a/perf/stress/stress.ts
++++ b/perf/stress/stress.ts
+@@ -7,21 +7,24 @@
+ //   bun run perf:stress --dataset=M --run=kinds
+ //   bun run perf:stress --dataset=M --run=overload --users=<knee>
+ //   bun run perf:stress --remote --dataset=M --run=ramp
+-//   bun run perf:stress --recording=<file> --dataset=M --run=kinds
++//   bun run perf:stress --app=native --recording=<file> --dataset=M --run=kinds
+ //
+ // Locally it builds the images, loads the dataset into the bench volume, and starts the stack
+ // (stack.ts). With --remote it sends load to a server that runs compose.bench.yml, which
+ // someone else started with the same dataset; it only sends requests and reads the sampler.
+ 
+-import { spawn } from 'node:child_process'
+-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+-import { join, relative } from 'node:path'
++import { spawn, spawnSync } from 'node:child_process'
++import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
++import { join, relative, resolve } from 'node:path'
+ import { parseArgs } from 'node:util'
+ import { table } from '../checks/baseline'
+ import { CACHE, ROOT } from '../lib/database'
+ import { type BenchUser, DATASETS, type DatasetName, dataset } from './dataset'
++import { checkOtherSessions, reserveStack } from './lock'
++import { droppedActions } from './metrics'
+ import { type Recording, record } from './record'
+ import {
++  type App,
+   K6_IMAGE,
+   LOCAL_HOST,
+   LOCAL_PORT,
+@@ -30,8 +33,11 @@ import {
+   NETWORK,
+   buildImages,
+   compose,
++  directTls,
++  directAddress,
+   loadDataset,
+   startStack,
++  useApp,
+ } from './stack'
+ 
+ // Server-side p95 targets in milliseconds (task 078, "Runs"), by request kind. Signing in
+@@ -55,7 +61,13 @@ const MAX_DISK_SHARE = 0.8
+ 
+ const { values } = parseArgs({
+   options: {
++    plan: { type: 'string' },
++    'past-capacity': { type: 'boolean', default: false },
++    runtime: { type: 'string', default: 'multi_thread' },
++    'queue-max-waiting': { type: 'string', default: '4096' },
++    'queue-timeout-ms': { type: 'string', default: '1000' },
+     dataset: { type: 'string', default: 'S' },
++    'dataset-date': { type: 'string' },
+     run: { type: 'string', default: 'fixed' },
+     users: { type: 'string' },
+     seconds: { type: 'string' },
+@@ -66,17 +78,41 @@ const { values } = parseArgs({
+     build: { type: 'boolean', default: true },
+     load: { type: 'boolean', default: true },
+     memory: { type: 'string' },
++    'app-cpuset': { type: 'string', default: '1' },
++    'k6-cpuset': { type: 'string', default: '2-9' },
++    'sampler-cpuset': { type: 'string', default: '1' },
++    'preallocated-vus': { type: 'string' },
++    'max-vus': { type: 'string' },
++    'warmup-seconds': { type: 'string', default: '30' },
++    'sampler-url': { type: 'string' },
++    'litestream-image': { type: 'string' },
++    'litestream-memory': { type: 'string', default: '128m' },
++    'replica-dir': { type: 'string' },
++    'read-connections': { type: 'string', default: '0' },
+     'caddy-memory': { type: 'string' },
+     smol: { type: 'boolean', default: false },
+     'max-requests': { type: 'string' },
+     'try-duration': { type: 'string' },
+     label: { type: 'string' },
++    app: { type: 'string', default: 'ts' },
+     recording: { type: 'string' },
+     'caddy-cpuset': { type: 'string' },
++    'caddy-config': { type: 'string' },
++    direct: { type: 'boolean', default: false },
++    encoding: { type: 'string' },
++    'connection-reuse': { type: 'boolean', default: true },
+   },
+   allowNegative: true,
+ })
+ 
++const app = values.app as App
++if (app !== 'ts' && app !== 'native') throw new Error('[stress] --app is ts or native')
++if (app === 'native' && !values.recording) {
++  throw new Error('[stress] The native backend serves no pages to record; pass --recording')
++}
++if (values.direct && app !== 'native') throw new Error('[stress] --direct requires --app=native')
++useApp(app)
++
+ const name = values.dataset as DatasetName
+ if (!DATASETS.includes(name)) throw new Error(`[stress] --dataset is one of ${DATASETS.join(', ')}`)
+ 
+@@ -109,7 +145,7 @@ const target: Target = values.remote
+       remote: true,
+     }
+   : {
+-      origin: `https://${LOCAL_HOST}`,
++      origin: `https://${LOCAL_HOST}${values.direct ? ':3000' : ''}`,
+       chromeAddress: `127.0.0.1:${LOCAL_PORT}`,
+       secret: LOCAL_SECRET,
+       samplerPassword: LOCAL_SAMPLER_PASSWORD,
+@@ -122,17 +158,28 @@ async function sampler<T>(path: string): Promise<T> {
+   const { hostname } = new URL(target.origin)
+   const port = target.remote ? 443 : LOCAL_PORT
+   const address = target.remote ? target.address! : '127.0.0.1'
++  const directSampler =
++    values['sampler-url'] ?? (!target.remote ? 'http://127.0.0.1:19100' : undefined)
+   const curl = Bun.spawn(
+     [
+       'curl',
+       '--silent',
+       '--fail',
+-      '--resolve',
+-      `${hostname}:${port}:${address}`,
+-      ...(target.insecure ? ['--insecure'] : []),
+-      '--user',
+-      `bench:${target.samplerPassword}`,
+-      `https://${hostname}:${port}${path}`,
++      '--max-time',
++      '20',
++      '--retry',
++      '3',
++      '--retry-connrefused',
++      ...(directSampler
++        ? [directSampler + path]
++        : [
++            '--resolve',
++            `${hostname}:${port}:${address}`,
++            ...(target.insecure ? ['--insecure'] : []),
++            '--user',
++            `bench:${target.samplerPassword}`,
++            `https://${hostname}:${port}${path}`,
++          ]),
+     ],
+     { stdout: 'pipe', stderr: 'pipe' },
+   )
+@@ -141,6 +188,20 @@ async function sampler<T>(path: string): Promise<T> {
+   return JSON.parse(text) as T
+ }
+ 
++interface ContainerSample {
++  [key: string]: number | string | undefined
++  generation: string
++  cpuUsec: number
++  memory: number
++  memoryPeak: number
++  rss: number
++  swap?: number
++  threads: number
++  anon: number
++  file: number
++  oomKills: number
++}
++
+ interface Sample {
+   t: number
+   cpu: Record<string, number>
+@@ -149,7 +210,7 @@ interface Sample {
+   diskUsed: number
+   diskTotal: number
+   files: Record<string, number>
+-  containers: Record<string, Record<string, number>>
++  containers: Record<string, ContainerSample>
+   readUsec: number
+   // The app's process.memoryUsage() and how long it took to answer, on a bench deployment.
+   heap?: { rss: number; heapTotal: number; heapUsed: number; external: number; answerMs: number }
+@@ -164,6 +225,7 @@ interface LoggedRequest {
+   size: number
+ }
+ 
++let outputDirectory: string | undefined
+ let logOffset = 0
+ const logged: LoggedRequest[] = []
+ 
+@@ -192,6 +254,10 @@ interface Step {
+   // One action alone, at this many per hour.
+   action?: string
+   perHour?: number
++  start?: number
++  organization?: string
++  userId?: string
++  excludeOrganization?: string
+ }
+ 
+ interface StepResult {
+@@ -219,13 +285,18 @@ async function runK6(
+     ORIGIN: target.origin,
+     SECRET: target.secret,
+     PLAN: JSON.stringify(plan),
++    ...((values.plan || values['past-capacity']) && { LANE_BENCH: '1' }),
++    ...(values['preallocated-vus'] && { PREALLOCATED_VUS: values['preallocated-vus'] }),
++    ...(values['max-vus'] && { MAX_VUS: values['max-vus'] }),
++    ...(values.encoding && { ENCODING: values.encoding }),
++    ...(!values['connection-reuse'] && { NO_CONNECTION_REUSE: '1' }),
+     ...(target.address && { HOST_IP: target.address }),
+     ...(target.insecure && { INSECURE: '1' }),
+   }
+   const args = [
+     'run',
+     '--rm',
+-    ...(target.remote ? [] : ['--network', NETWORK, '--cpuset-cpus', '2-9']),
++    ...(target.remote ? [] : ['--network', NETWORK, '--cpuset-cpus', values['k6-cpuset']]),
+     '-v',
+     `${join(ROOT, 'perf/stress')}:/scripts:ro`,
+     '-v',
+@@ -239,6 +310,7 @@ async function runK6(
+     '--no-usage-report',
+     '/scripts/scenario.js',
+   ]
++  rmSync(join(files.out, 'summary.json'), { force: true })
+   const k6 = spawn('docker', args, { stdio: ['ignore', 'inherit', 'inherit'] })
+   const exited = new Promise<number>((resolve) => k6.on('exit', (code) => resolve(code ?? 1)))
+   let aborted: string | null = null
+@@ -254,6 +326,9 @@ async function runK6(
+   } else {
+     await exited
+   }
++  const code = await exited
++  if (code !== 0 && !aborted)
++    throw new Error(`k6 exited ${code}; refusing stale or invalid results`)
+   const summary = JSON.parse(readFileSync(join(files.out, 'summary.json'), 'utf8')) as K6Summary
+   return { summary, aborted }
+ }
+@@ -278,28 +353,50 @@ function rates(samples: Sample[]) {
+   const last = samples.at(-1)!
+   const seconds = last.t - first.t || 1
+   function container(name: string) {
+-    const a = first.containers[name] ?? {}
+-    const b = last.containers[name] ?? {}
++    const observed = samples.filter((s) => s.containers[name])
++    const a = observed[0]?.containers[name]
++    const b = observed.at(-1)?.containers[name]
++    let observedSeconds = 0
++    const deltas: Record<string, number> = {}
++    let peakCpu = 0
++    for (let i = 1; i < observed.length; i++) {
++      const previous = observed[i - 1],
++        next = observed[i]
++      const x = previous.containers[name],
++        y = next.containers[name]
++      if (x.generation !== y.generation || y.cpuUsec < x.cpuUsec) continue
++      const elapsed = next.t - previous.t
++      if (elapsed > 2 || elapsed <= 0) continue
++      observedSeconds += elapsed
++      peakCpu = Math.max(peakCpu, (y.cpuUsec - x.cpuUsec) / elapsed / 1e6)
++      for (const key of Object.keys(y)) {
++        if (typeof y[key] === 'number' && typeof x[key] === 'number')
++          deltas[key] = (deltas[key] ?? 0) + Math.max(0, y[key] - x[key])
++      }
++    }
+     function per(key: string) {
+-      return ((b[key] ?? 0) - (a[key] ?? 0)) / seconds
++      return (deltas[key] ?? 0) / (observedSeconds || 1)
+     }
+     const peak = Math.max(...samples.map((s) => s.containers[name]?.memory ?? 0))
+     return {
+       cpu: per('cpuUsec') / 1e6,
+-      cpuUsec: (b.cpuUsec ?? 0) - (a.cpuUsec ?? 0),
++      cpuUsec: deltas.cpuUsec ?? 0,
++      observedSeconds,
++      peakCpu,
+       throttled: per('throttledUsec') / 1e6,
+-      memory: b.memory ?? 0,
++      memory: b?.memory ?? 0,
+       peak,
+-      peakEver: b.memoryPeak ?? 0,
+-      anon: b.anon ?? 0,
+-      file: b.file ?? 0,
++      peakEver: b?.memoryPeak ?? 0,
++      anon: b?.anon ?? 0,
++      file: b?.file ?? 0,
+       rss: Math.max(...samples.map((s) => s.containers[name]?.rss ?? 0)),
++      swap: Math.max(...samples.map((s) => s.containers[name]?.swap ?? 0)),
+       read: per('readBytes'),
+       write: per('writeBytes'),
+       cpuPressure: per('cpuSome') / 1e6,
+       memoryPressure: per('memorySome') / 1e6,
+       ioPressure: per('ioSome') / 1e6,
+-      oomKills: (b.oomKills ?? 0) - (a.oomKills ?? 0),
++      oomKills: (b?.oomKills ?? 0) - (a?.oomKills ?? 0),
+     }
+   }
+   const ticks = Object.keys(last.cpu).reduce((t, k) => t + last.cpu[k] - first.cpu[k], 0) || 1
+@@ -308,6 +405,8 @@ function rates(samples: Sample[]) {
+     app: container('app'),
+     caddy: container('caddy'),
+     sampler: container('sampler'),
++    k6: container('k6'),
++    litestream: container('litestream'),
+     steal: (last.cpu.steal - first.cpu.steal) / ticks,
+     memoryUsed: Math.max(...samples.map((s) => s.memTotal - s.memAvailable)),
+     memTotal: last.memTotal,
+@@ -330,13 +429,23 @@ function heapStats(heaps: NonNullable<Sample['heap']>[]) {
+   }
+ }
+ 
++function requestBounds(requests: LoggedRequest[]) {
++  let first = Infinity
++  let last = -Infinity
++  for (const request of requests) {
++    first = Math.min(first, request.t)
++    last = Math.max(last, request.t)
++  }
++  return { first, last }
++}
++
+ // Where a step misses a target: a kind's p95 over any 30-second window, the error share, or
+ // a dropped iteration.
+ function misses(result: StepResult): string[] {
+   const found: string[] = []
+   const { requests } = result
+-  if (requests.length === 0) return ['no requests reached the server']
+-  const start = Math.min(...requests.map((r) => r.t))
++  if (requests.length === 0) return ['no access-log samples; server-window validation unavailable']
++  const start = requestBounds(requests).first
+   const windows = new Map<string, number[]>()
+   for (const r of requests) {
+     const key = `${r.kind}|${Math.floor((r.t - start) / WINDOW_S)}`
+@@ -356,7 +465,7 @@ function misses(result: StepResult): string[] {
+   if (sent > 0 && failed / sent > MAX_ERROR_SHARE) {
+     found.push(`${((failed / sent) * 100).toFixed(2)}% errors`)
+   }
+-  const dropped = metric(result.summary, `dropped_iterations{step:${result.step.name}}`, 'count')
++  const dropped = droppedActions(result.summary.metrics, result.step.name)
+   if (dropped > 0) found.push(`${dropped} dropped iterations (invalid run)`)
+   return [...new Set(found)]
+ }
+@@ -384,14 +493,23 @@ function report(result: StepResult): string {
+   const sent = metric(summary, `http_reqs{step:${step.name}}`, 'count')
+   const seconds = Math.max(
+     1,
+-    Math.max(...requests.map((r) => r.t)) - Math.min(...requests.map((r) => r.t)) || step.seconds,
++    requests.length
++      ? requestBounds(requests).last - requestBounds(requests).first || step.seconds
++      : step.seconds,
+   )
+   const completed = requests.filter((r) => r.status > 0 && r.status < 400).length
+   lines.push(
+     `\n${step.name}: ${step.users} active users, ${step.seconds} s${result.aborted ? ' (aborted)' : ''}. ` +
+-      `Offered ${(sent / step.seconds).toFixed(1)} req/s, completed ${(completed / seconds).toFixed(1)} req/s`,
++      `Offered ${(sent / step.seconds).toFixed(1)} req/s, ` +
++      (requests.length
++        ? `completed ${(completed / seconds).toFixed(1)} req/s`
++        : 'logged completions unavailable'),
+   )
+-  const kinds = [...new Set(requests.map((r) => r.kind))].sort()
++  const prefix = `http_reqs{step:${step.name},kind:`
++  const kinds = Object.keys(summary.metrics)
++    .filter((key) => key.startsWith(prefix) && metric(summary, key, 'count') > 0)
++    .map((key) => key.slice(prefix.length, -1))
++    .sort()
+   const rows = kinds.map((kind) => {
+     const server = requests.filter((r) => r.kind === kind).map((r) => r.duration * 1000)
+     function client(stat: string) {
+@@ -422,7 +540,7 @@ function report(result: StepResult): string {
+   lines.push(`Errors: ${errors.join(', ') || 'none'}`)
+   if (result.samples.length > 1) {
+     const r = rates(result.samples)
+-    const serverRequests = requests.length || 1
++    const serverRequests = sent || 1
+     lines.push(
+       table(
+         [
+@@ -434,13 +552,14 @@ function report(result: StepResult): string {
+           'anon',
+           'cache',
+           'RSS',
++          'swap',
+           'read MB/s',
+           'write',
+           'PSI cpu',
+           'mem',
+           'io',
+         ],
+-        (['app', 'caddy', 'sampler'] as const).map((n) => {
++        (['app', 'caddy', 'sampler', 'litestream', 'k6'] as const).map((n) => {
+           const c = r[n]
+           return [
+             n,
+@@ -451,6 +570,7 @@ function report(result: StepResult): string {
+             mb(c.anon),
+             mb(c.file),
+             mb(c.rss),
++            mb(c.swap),
+             (c.read / 1e6).toFixed(2),
+             (c.write / 1e6).toFixed(2),
+             `${(c.cpuPressure * 100).toFixed(0)}%`,
+@@ -466,6 +586,9 @@ function report(result: StepResult): string {
+         `host memory ${mb(r.memoryUsed)} of ${mb(r.memTotal)} MB; database ${mb(r.database)} MB; ` +
+         `disk ${(r.diskShare * 100).toFixed(0)}%; OOM kills ${r.app.oomKills}`,
+     )
++    lines.push(
++      `k6 CPU observed for ${r.k6.observedSeconds.toFixed(0)} s: mean ${(r.k6.cpu * 100).toFixed(1)}%, peak one-second ${(r.k6.peakCpu * 100).toFixed(1)}%; app peak threads ${Math.max(...result.samples.map((s) => s.containers.app?.threads ?? 0))}`,
++    )
+     if (r.heap) {
+       const { peak, slowest, stalled } = r.heap
+       lines.push(
+@@ -491,12 +614,28 @@ async function runPlan(plan: Step[], files: { recording: string; users: string;
+   const began = Date.now() / 1000
+   async function watch(): Promise<string | null> {
+     await readLog()
+-    if (!target.remote) return null
++    if (!target.remote) {
++      const recent = await samplesBetween(Date.now() / 1000 - 5, Date.now() / 1000)
++      const last = recent.at(-1)
++      if (last && (last.memTotal - last.memAvailable) / last.memTotal > MAX_MEMORY_SHARE)
++        return 'shared VM memory above 85% (invalid co-located generator run)'
++      const cores = values['k6-cpuset'].split(',').reduce((n, part) => {
++        const [a, b] = part.split('-').map(Number)
++        return n + (b === undefined ? 1 : b - a + 1)
++      }, 0)
++      if (recent.length >= 3) {
++        const k = rates(recent).k6
++        if (k.observedSeconds >= 2 && k.cpu > cores * 0.7)
++          return 'k6 CPU above 70% of assigned cores (invalid generator-limited run)'
++      }
++      return null
++    }
+     const now = Date.now() / 1000
+     const [last] = (await samplesBetween(now - 5, now)).slice(-1)
+     if (last && (last.memTotal - last.memAvailable) / last.memTotal > MAX_MEMORY_SHARE)
+       return 'memory above 85%'
+     if (last && last.diskUsed / last.diskTotal > MAX_DISK_SHARE) return 'disk above 80%'
++    if (values.plan || values['past-capacity']) return null
+     // Any kind over its target for the last 30 seconds.
+     const recent = logged.filter((r) => r.t > now - WINDOW_S - 5)
+     for (const kind of new Set(recent.map((r) => r.kind))) {
+@@ -516,8 +655,8 @@ async function runPlan(plan: Step[], files: { recording: string; users: string;
+   const results: StepResult[] = []
+   for (const step of plan) {
+     const requests = logged.filter((r) => r.step === step.name && r.t >= began)
+-    const from = requests.length ? Math.min(...requests.map((r) => r.t)) : began
+-    const to = requests.length ? Math.max(...requests.map((r) => r.t)) : ended
++    const from = requests.length ? requestBounds(requests).first : began
++    const to = requests.length ? requestBounds(requests).last : ended
+     const result: StepResult = {
+       step,
+       summary,
+@@ -529,6 +668,25 @@ async function runPlan(plan: Step[], files: { recording: string; users: string;
+     const text = report(result)
+     console.log(text)
+     writeFileSync(join(files.out, `${step.name}.txt`), text)
++    writeFileSync(join(files.out, `${step.name}.samples.json`), JSON.stringify(result.samples))
++    writeFileSync(join(files.out, `${step.name}.summary.json`), JSON.stringify(summary))
++    writeFileSync(join(files.out, `${step.name}.requests.json`), JSON.stringify(result.requests))
++    const missed = misses(result)
++    writeFileSync(
++      join(files.out, `${step.name}.validity.json`),
++      JSON.stringify(
++        {
++          generatorLimited:
++            aborted?.includes('k6 CPU') ||
++            aborted?.includes('shared VM memory') ||
++            missed.some((reason) => reason.includes('dropped iterations')),
++          aborted,
++          missed,
++        },
++        null,
++        2,
++      ),
++    )
+   }
+   if (aborted) console.log(`[stress] Stopped early: ${aborted}`)
+   return { results, aborted }
+@@ -542,38 +700,84 @@ async function idleMemory(): Promise<string> {
+   const app = samples.at(-1)?.containers.app
+   if (!app) return 'Idle: no samples'
+   const text =
+-    `Idle app: memory ${mb(app.memory)} MB (anon ${mb(app.anon)}, cache ` +
++    `Idle app (${values.app}): memory ${mb(app.memory)} MB (anon ${mb(app.anon)}, cache ` +
+     `${mb(app.file)}), RSS ${mb(app.rss)} MB`
+   console.log(`[stress] ${text}`)
+   return text
+ }
+ 
+ async function main() {
+-  const paths = await dataset(name)
++  const paths = await dataset(name, values['dataset-date'])
+   if (!target.remote) {
++    if (!values.load && values['replica-dir']) {
++      const current = spawnSync('docker', ['inspect', 'snowtime-bench-litestream-1'], {
++        encoding: 'utf8',
++      })
++      if (current.status !== 0) throw new Error('Cannot inspect the prepared replication stack')
++      const inspection = JSON.parse(current.stdout)[0]
++      const mounts = inspection.Mounts as {
++        Destination: string
++        Source: string
++      }[]
++      if (
++        mounts
++          .find((mount) => mount.Destination === '/replica')
++          ?.Source.replace(/^\/host_mnt(?=\/)/, '') !==
++        resolve(values['replica-dir']).replace(/^\/host_mnt(?=\/)/, '')
++      )
++        throw new Error("--no-load must retain the prepared stack's replica directory")
++      if (!inspection.State.Running)
++        throw new Error('The prepared replication process must be running')
++      if (values['litestream-image'] && inspection.Config.Image !== values['litestream-image'])
++        throw new Error('--no-load must retain the prepared Litestream image')
++      const memory = Number(values['litestream-memory'].replace(/m$/i, '')) * 1024 * 1024
++      if (inspection.HostConfig.Memory !== memory)
++        throw new Error('--no-load must retain the prepared Litestream memory limit')
++    }
+     if (values.build) buildImages()
++    const tls = join(CACHE, 'stress', 'edge', 'tls')
++    if (values.direct) directTls(tls)
+     const settings = {
++      ...(values['replica-dir'] && { BENCH_REPLICA_DIR: resolve(values['replica-dir']) }),
++      ...(values['litestream-image'] && { BENCH_LITESTREAM_IMAGE: values['litestream-image'] }),
++      BENCH_LITESTREAM_MEMORY: values['litestream-memory'],
++      BENCH_APP_CPUSET: values['app-cpuset'],
++      BENCH_SAMPLER_CPUSET: values['sampler-cpuset'],
++      BENCH_TOKIO_RUNTIME: values.runtime,
++      BENCH_QUEUE_MAX_WAITING: values['queue-max-waiting'],
++      BENCH_QUEUE_TIMEOUT_MS: values['queue-timeout-ms'],
++      BENCH_READ_CONNECTIONS: values['read-connections'],
++      ...(values.direct && { BENCH_DIRECT_TLS: tls }),
+       ...(values.memory && { BENCH_APP_MEMORY: values.memory }),
+       ...(values['caddy-memory'] && { BENCH_CADDY_MEMORY: values['caddy-memory'] }),
+       ...(values.smol && { BENCH_BUN_OPTIONS: '--smol' }),
+       ...(values['max-requests'] && { BENCH_MAX_REQUESTS: values['max-requests'] }),
+       ...(values['try-duration'] && { BENCH_TRY_DURATION: values['try-duration'] }),
+       ...(values['caddy-cpuset'] && { BENCH_CADDY_CPUSET: values['caddy-cpuset'] }),
++      ...(values['caddy-config'] && { BENCH_CADDY_CONFIG: resolve(values['caddy-config']) }),
++    }
++    if (!values['replica-dir']) {
++      const stop = Bun.spawnSync(['docker', 'stop', 'snowtime-bench-litestream-1'], {
++        stdout: 'ignore',
++        stderr: 'ignore',
++      })
++      if (stop.exitCode !== 0) console.log('[stress] No replication container to stop.')
+     }
+     if (values.load) {
+       compose(['up', '-d', '--no-start'], settings)
+-      loadDataset(paths.database)
++      loadDataset(paths.database, settings)
+     }
+-    startStack(settings)
++    startStack(settings, !values.load && !!values['replica-dir'])
++    if (values.direct) target.address = directAddress()
+   }
+   // The log keeps earlier runs' requests; this one reads only its own.
+   logOffset = (await sampler<{ offset: number }>('/_bench/log?offset=end')).offset
+-  const idle = await idleMemory()
+-  const users = JSON.parse(readFileSync(paths.users, 'utf8')) as BenchUser[]
+-  // A member of a mid-sized company records, so its pages are typical.
+-  const recorder =
+-    users.find((u) => u.role === 'member' && u.projectIds.length > 0 && u.slug !== 'lumen') ??
+-    users.find((u) => u.slug === 'lumen' && u.role === 'member')!
++  if (Number(values['warmup-seconds']) > 0) {
++    console.log(
++      `[stress] Waiting ${values['warmup-seconds']} s for startup/replication before measuring`,
++    )
++    await Bun.sleep(Number(values['warmup-seconds']) * 1000)
++  }
+   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+   const out = join(
+     CACHE,
+@@ -582,8 +786,46 @@ async function main() {
+     `${stamp}-${name}-${values.run}${values.label ? `-${values.label}` : ''}`,
+   )
+   mkdirSync(out, { recursive: true })
++  outputDirectory = out
++  writeFileSync(join(out, 'settings.json'), JSON.stringify(values, null, 2))
++  if (values['replica-dir'] && !target.remote && values.load) {
++    console.log('[stress] Waiting for initial replication before measuring')
++    const deadline = Date.now() + 15 * 60 * 1000
++    for (;;) {
++      checkReplicationRunning()
++      const logs = spawnSync('docker', ['logs', 'snowtime-bench-litestream-1'], {
++        encoding: 'utf8',
++      })
++      const text = logs.stdout + logs.stderr
++      if (
++        text
++          .split('\n')
++          .some(
++            (line) =>
++              (line.includes('compaction complete') &&
++                line.includes('level=1') &&
++                line.includes('txid.min=0000000000000001')) ||
++              (line.includes('ltx file uploaded') &&
++                line.includes('level=0') &&
++                line.includes('minTXID=0000000000000001') &&
++                line.includes('maxTXID=0000000000000001')),
++          )
++      )
++        break
++      if (Date.now() >= deadline)
++        throw new Error('Initial replication did not finish in 15 minutes')
++      await Bun.sleep(5000)
++    }
++  }
++  const idle = await idleMemory()
++  const users = JSON.parse(readFileSync(paths.users, 'utf8')) as BenchUser[]
++  // A member of a mid-sized company records, so its pages are typical.
++  const recorder =
++    users.find((u) => u.role === 'member' && u.projectIds.length > 0 && u.slug !== 'lumen') ??
++    users.find((u) => u.slug === 'lumen' && u.role === 'member')!
+   writeFileSync(join(out, 'idle.txt'), idle)
+-  // A given recording replays as it is, such as one cut down to some of the calls.
++  // A given recording replays as it is, such as one cut down to the calls the native backend
++  // serves (snowtime-native's harness/api-recording.ts).
+   let recording: Recording
+   if (values.recording) {
+     recording = JSON.parse(readFileSync(values.recording, 'utf8')) as Recording
+@@ -602,7 +844,58 @@ async function main() {
+   const files = { recording: recordingFile, users: paths.users, out }
+   const stepSeconds = Number(values['step-seconds'])
+ 
+-  if (values.run === 'fixed' || values.run === 'calibration') {
++  function checkReplicationRunning() {
++    const inspection = spawnSync(
++      'docker',
++      ['inspect', '--format', '{{json .State}}', 'snowtime-bench-litestream-1'],
++      { encoding: 'utf8' },
++    )
++    if (inspection.status !== 0) throw new Error('Cannot inspect Litestream startup')
++    const state = JSON.parse(inspection.stdout)
++    if (!state.Running) {
++      writeFileSync(join(out, 'litestream-state.json'), JSON.stringify(state, null, 2))
++      throw new Error(
++        `Litestream stopped during startup: OOM=${state.OOMKilled}, exit=${state.ExitCode}`,
++      )
++    }
++  }
++
++  async function waitInitialCompaction() {
++    if (target.remote || !values['replica-dir'] || !values.load) return
++    console.log('[stress] Waiting for initial level-two replication compaction before measuring')
++    const deadline = Date.now() + 15 * 60 * 1000
++    for (;;) {
++      checkReplicationRunning()
++      const logs = spawnSync('docker', ['logs', 'snowtime-bench-litestream-1'], {
++        encoding: 'utf8',
++      })
++      if (
++        (logs.stdout + logs.stderr)
++          .split('\n')
++          .some(
++            (line) =>
++              line.includes('compaction complete') &&
++              line.includes('level=2') &&
++              line.includes('txid.min=0000000000000001'),
++          )
++      ) {
++        console.log('[stress] Initial replication compactions complete')
++        return
++      }
++      if (Date.now() >= deadline) throw new Error('Initial compaction did not finish in 15 minutes')
++      await Bun.sleep(5000)
++    }
++  }
++  if (values.run !== 'ramp' && !target.remote && values['replica-dir']) {
++    // A first write makes Litestream eligible to compact the initial database copy.
++    await runPlan([{ name: 'replication-warmup', users: 500, seconds: 30 }], files)
++    await waitInitialCompaction()
++  }
++
++  if (values.plan) {
++    const plan = JSON.parse(readFileSync(resolve(values.plan), 'utf8')) as Step[]
++    await runPlan(plan, files)
++  } else if (values.run === 'fixed' || values.run === 'calibration') {
+     const usersCount = Number(values.users ?? (values.run === 'calibration' ? 100 : 200))
+     await runPlan(
+       [{ name: 'fixed', users: usersCount, seconds: Number(values.seconds ?? 300) }],
+@@ -615,8 +908,16 @@ async function main() {
+     if (from > 0) {
+       console.log(`\n[stress] Warming up at ${Math.round(from / 2)} users for 30 s`)
+       await runPlan([{ name: 'warmup', users: Math.round(from / 2), seconds: 30 }], files)
++      await waitInitialCompaction()
+     }
+     let lastGood: number | undefined
++    let firstFail: number | undefined
++    function capacity(users: number | null, generatorLimited: boolean, reason?: string) {
++      writeFileSync(
++        join(out, 'capacity.json'),
++        JSON.stringify({ users, firstFail, generatorLimited, reason }, null, 2),
++      )
++    }
+     for (const [i, count] of steps.entries()) {
+       const { results, aborted } = await runPlan(
+         [{ name: `u${count}`, users: count, seconds: stepSeconds }],
+@@ -627,34 +928,65 @@ async function main() {
+         lastGood = count
+         continue
+       }
++      firstFail = count
+       console.log(`\n[stress] ${count} users missed: ${aborted ?? missed.join('; ')}`)
++      if (
++        aborted?.includes('k6 CPU') ||
++        aborted?.includes('shared VM memory') ||
++        missed.some((m) => m.includes('dropped iterations'))
++      ) {
++        capacity(null, true, aborted ?? missed.join('; '))
++        return
++      }
+       if (target.remote && i >= 2) {
+         console.log(`[stress] Dropping to ${steps[i - 2]} users for 2 minutes`)
+         await runPlan([{ name: `cool${steps[i - 2]}`, users: steps[i - 2], seconds: 120 }], files)
+       }
+       break
+     }
++    if (lastGood === undefined && values['past-capacity']) {
++      lastGood = RAMP.filter((users) => users < from).at(-1)
++    }
+     if (lastGood === undefined) {
+       console.log('[stress] Not even the first step held.')
++      capacity(null, false, 'First ramp step failed')
+       return
+     }
+-    // A hold that misses falls back to the step below, twice at most.
+-    const holds = RAMP.filter((n) => n <= lastGood)
+-      .slice(-3)
+-      .toReversed()
++    // Validate lower offers until one holds; growing WAL can make several earlier steps fail.
++    const holds = RAMP.filter((n) => n <= lastGood).toReversed()
+     for (const users of holds) {
+       console.log(`\n[stress] Holding ${users} users for ${values['hold-seconds']} s`)
+-      const { results } = await runPlan(
++      const { results, aborted } = await runPlan(
+         [{ name: `hold${users}`, users, seconds: Number(values['hold-seconds']) }],
+         files,
+       )
+       const missed = misses(results[0])
+-      if (missed.length === 0) {
++      if (
++        aborted?.includes('k6 CPU') ||
++        aborted?.includes('shared VM memory') ||
++        missed.some((m) => m.includes('dropped iterations'))
++      ) {
++        capacity(null, true, aborted ?? missed.join('; '))
++        return
++      }
++      if (missed.length === 0 && !aborted) {
+         console.log(`\n[stress] Capacity on ${name}: ${users} active users`)
++        capacity(users, false)
++        if (values['past-capacity']) {
++          await runPlan(
++            [
++              { name: 'x2', users: users * 2, seconds: stepSeconds },
++              { name: 'x4', users: users * 4, seconds: stepSeconds },
++              { name: 'recover', users, seconds: Number(values['hold-seconds']) },
++            ],
++            files,
++          )
++        }
+         return
+       }
+       console.log(`\n[stress] The hold at ${users} users missed: ${missed.join('; ')}`)
+     }
++    capacity(null, false, 'All hold candidates failed')
+   } else if (values.run === 'overload') {
+     if (target.remote) throw new Error('[stress] Overload runs locally only.')
+     const knee = Number(values.users ?? 0)
+@@ -669,7 +1001,7 @@ async function main() {
+       files,
+     )
+   } else if (values.run === 'kinds') {
+-    // Each action alone at a low rate, for the CPU and server time each costs.
++    // Isolate page, API, and auth kinds so their CPU totals do not mix.
+     const perSecond = Number(values.users ?? 2)
+     const actions = [
+       'open',
+@@ -687,9 +1019,34 @@ async function main() {
+         (a) => (recording.actions[a as keyof Recording['actions']] ?? []).length > 0,
+       ),
+     )
++    const split = {
++      ...recording,
++      actions: { ...recording.actions } as Record<string, Recording['actions']['open']>,
++    }
++    const kinds = actions.flatMap((action) => {
++      if (action === 'timer') return [action]
++      const requests = split.actions[action]
++      const groups = new Map<string, typeof requests>()
++      for (const request of requests) {
++        const type = request.path.startsWith('/api/auth/')
++          ? 'auth'
++          : request.path.startsWith('/api/v1/') || request.path.startsWith('/_serverFn/')
++            ? 'api'
++            : 'page'
++        const group = groups.get(type) ?? []
++        group.push(request)
++        groups.set(type, group)
++      }
++      return [...groups.entries()].map(([type, requests]) => {
++        const key = `${action}:${type}`
++        split.actions[key] = requests
++        return key
++      })
++    })
++    writeFileSync(files.recording, JSON.stringify(split, null, 1))
+     const { results } = await runPlan(
+-      actions.map((action) => ({
+-        name: action,
++      kinds.map((action) => ({
++        name: action.replaceAll(':', '-'),
+         users: 0,
+         seconds: Number(values.seconds ?? 60),
+         action,
+@@ -698,21 +1055,32 @@ async function main() {
+       files,
+     )
+     const rows = results.map((r) => {
+-      const { app } = rates(r.samples)
++      const { app, caddy } = rates(r.samples)
++      const sent = metric(r.summary, `http_reqs{step:${r.step.name}}`, 'count')
+       const actionsRun = metric(r.summary, `bench_action_duration{step:${r.step.name}}`, 'count')
+       const server = r.requests.map((q) => q.duration * 1000)
+       return [
+         r.step.name,
+         `${actionsRun}`,
+-        (r.requests.length / Math.max(1, actionsRun)).toFixed(1),
++        (sent / Math.max(1, actionsRun)).toFixed(1),
+         (app.cpuUsec / Math.max(1, actionsRun) / 1000).toFixed(1),
+-        (app.cpuUsec / Math.max(1, r.requests.length) / 1000).toFixed(1),
++        (app.cpuUsec / Math.max(1, sent) / 1000).toFixed(1),
++        (caddy.cpuUsec / Math.max(1, sent) / 1000).toFixed(2),
+         ms(percentile(server, 50)),
+         ms(percentile(server, 95)),
+       ]
+     })
+     const text = table(
+-      ['Action', 'actions', 'req/action', 'CPU ms/action', 'CPU ms/req', 'srv p50', 'srv p95'],
++      [
++        'Action',
++        'actions',
++        'req/action',
++        'CPU ms/action',
++        'CPU ms/req',
++        'Caddy ms/req',
++        'srv p50',
++        'srv p95',
++      ],
+       rows,
+     )
+     console.log(`\n${text}`)
+@@ -723,4 +1091,50 @@ async function main() {
+   console.log(`\n[stress] Results in ${relative(ROOT, out)}`)
+ }
+ 
+-await main()
++const releaseStack = target.remote ? () => {} : reserveStack()
++process.once('exit', releaseStack)
++try {
++  if (!target.remote) checkOtherSessions()
++  await main()
++} finally {
++  if (!target.remote && outputDirectory) {
++    for (const service of [
++      'app',
++      'caddy',
++      'sampler',
++      ...(values['replica-dir'] ? ['litestream'] : []),
++    ]) {
++      const logs = spawnSync('docker', ['logs', '--timestamps', `snowtime-bench-${service}-1`], {
++        encoding: 'utf8',
++        maxBuffer: 32 * 1024 * 1024,
++      })
++      writeFileSync(join(outputDirectory, `${service}.log`), logs.stdout + logs.stderr)
++      const state = spawnSync(
++        'docker',
++        ['inspect', '-f', '{{json .State}}', `snowtime-bench-${service}-1`],
++        { encoding: 'utf8' },
++      )
++      writeFileSync(join(outputDirectory, `${service}.state.json`), state.stdout)
++    }
++    const images = spawnSync(
++      'docker',
++      [
++        'image',
++        'inspect',
++        '--format',
++        '{{.RepoTags}} {{.Id}}',
++        'snowtime-native:bench',
++        'snowtime-app:bench',
++        'snowtime-caddy:bench',
++        'snowtime-sampler:bench',
++        ...(values['replica-dir']
++          ? [values['litestream-image'] ?? 'litestream/litestream:0.5.0']
++          : []),
++      ],
++      { encoding: 'utf8' },
++    )
++    writeFileSync(join(outputDirectory, 'images.txt'), images.stdout)
++  }
++  releaseStack()
++  process.removeListener('exit', releaseStack)
++}

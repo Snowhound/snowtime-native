@@ -1,0 +1,15 @@
+# The build context is the repository root; the image needs only these.
+*
+!Cargo.toml
+!Cargo.lock
+!rust-toolchain.toml
+!THIRD_PARTY_LICENSES
+!crates
+crates/render/results
+!adapter/bootstrap.js
+!adapter/api-trace.js
+!adapter/dist
+!deploy/v8-archive.sh
+!app/src/lib/holidays/ee.json
+!adapter/bench/api-microbench.js
+!adapter/bench/dist
