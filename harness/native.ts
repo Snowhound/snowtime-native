@@ -2,8 +2,8 @@
 // password sign-in on, as conformance/server.ts expects a server under test to run. As
 // perf/lib/app.ts's startApp does, it turns every user's scene off.
 import { createClient } from '@libsql/client'
-import { spawn } from 'node:child_process'
-import { cpSync, rmSync } from 'node:fs'
+import { spawn, spawnSync } from 'node:child_process'
+import { cpSync, readFileSync, rmSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { CACHE, SEED_NOW } from '../app/perf/lib/database'
@@ -75,5 +75,24 @@ export async function startNative(
       rmSync(`${copy}-wal`, { force: true })
       rmSync(`${copy}-shm`, { force: true })
     },
+  }
+}
+
+let ticksPerSecond: number | undefined
+export function processUsage(pid: number) {
+  ticksPerSecond ??= Number(spawnSync('getconf', ['CLK_TCK'], { encoding: 'utf8' }).stdout.trim())
+  if (!ticksPerSecond) throw new Error('Cannot read CLK_TCK')
+  const stat = readFileSync(`/proc/${pid}/stat`, 'utf8').split(')').at(-1)!.trim().split(/\s+/)
+  const status = readFileSync(`/proc/${pid}/status`, 'utf8')
+  function kib(name: string) {
+    const value = status.match(new RegExp(`^${name}:\\s+(\\d+) kB`, 'm'))
+    if (!value) throw new Error(`Missing ${name} for pid ${pid}`)
+    return Number(value[1])
+  }
+  return {
+    cpuMs: ((Number(stat[11]) + Number(stat[12])) * 1000) / ticksPerSecond,
+    peakMiB: kib('VmHWM') / 1024,
+    rssMiB: kib('VmRSS') / 1024,
+    swapKiB: kib('VmSwap'),
   }
 }

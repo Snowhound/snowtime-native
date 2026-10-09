@@ -1,7 +1,7 @@
 # 081.01: Server rendering in the native backend
 
-Status: in-progress (the native host serves pages, measured 2026-10-04; the memory
-target agreed on 2026-10-07 awaits its Linux check)
+Status: in-progress (the native host serves pages; Hetzner confirmation is deferred
+until the port and porting-kit refactor are complete)
 
 The native backend renders pages and the browser hydrates them, as it does with today's
 Start server. Rust embeds a V8 isolate that runs the app's Solid server render. Kait chose
@@ -482,6 +482,76 @@ gaps, with production-mode refusal checks and a shared write-limit switch.
 - Bring the 161 MiB warmup peak down if the target needs it: it comes before the first
   trim, while V8 optimizes the bundle.
 
+## Baseline before the kit refactor
+
+Status: procedure prepared on 2026-10-08; Ryzen results pending Kait's run. This full
+baseline records the starting capacity and app RSS for the kit phase. It does not
+close the Hetzner criterion, which waits until the port and kit refactor are complete.
+The quick per-step gate is documented in [native/README.md](../../native/README.md#performance-gate-for-the-kit-refactor).
+
+Run on Kait's Ryzen under WSL with Docker. The script records the exact CPU, kernel,
+Docker resources/version, commit and working-tree diff, image IDs, SHA-256 input
+hashes, UTC command boundaries, and arguments. Record the resulting identifiers,
+held offer, two lifetime/hold RSS peaks, and raw evidence here after Kait returns
+output. No numbers are claimed before that run. Step 0 remains commit `332b476`.
+
+[`kit-baseline.ts`](../../native/bench/scaling/kit-baseline.ts) runs one M capacity
+ramp with 30-second steps and a 120-second passing hold, then two fresh 120-second
+runs at that held offer. Each invocation restores the source and drops caches before
+starting a fresh app. The native app uses one renderer, zero readers, `multi_thread`,
+4,096 waiters, a one-second queue deadline, `--cpus=1`, CPU 0 affinity, and 2 GiB
+memory with no app swap. Its own sizing chooses the heap and semi-space. Preserve
+and verify the sizing log. `/proc/1/status`'s `VmHWM` includes startup and page
+warmup; report it separately from the hold's sampled RSS peak, in MiB.
+
+Native serves TLS directly with gzip; replication is off. Caddy exposes only
+instrumentation. Caddy and the sampler share CPU 0; k6 uses the remaining Docker
+CPUs. The app's 2 GiB limit excludes the generator, instrumentation, OS, and cache.
+This shared WSL VM baseline is not a whole-host acceptance result for 081.27.
+Give Docker at least four CPUs and enough RAM for headroom (8 GiB or more).
+Leave Windows and WSL idle; no builds, tests, or other load during measurement.
+Use the Windows sleep-prevention procedure in the native README. No LAN run is
+involved and no Windows LAN reservation is needed.
+
+Transfer `081-linux-confirmation` to the Ryzen without pushing, using a Git bundle
+if needed, as documented in the native README. With Bun 1.4.2, Docker/Compose, and
+Chrome available to Playwright's `chrome` channel, run in a Linux filesystem checkout:
+
+```sh
+baseline_date=$(date -u +%F)
+baseline_recording=perf/.cache/stress/kit-pages.json
+bun native/bench/scaling/kit-baseline.ts --prepare \
+  --date="$baseline_date" --recording="$baseline_recording"
+# Preparation finishes before measurement starts. Leave both machines idle.
+bun native/bench/scaling/kit-baseline.ts \
+  --date="$baseline_date" --recording="$baseline_recording"
+```
+
+Preparation builds images and captures fixtures. It creates the page-inclusive
+recording if absent and preserves an existing one. Measurement requires the prepared
+commit and image IDs. Allow roughly 10–20 minutes plus preparation. The default ramp
+starts at 10,000 users; if its first rung fails, retain that attempt as excluded and
+repeat with `--from=1000`. Report the highest passing rung of this quick ramp, not
+an exact maximum. The runner keeps task 10's normal latency/error targets and guards.
+
+Before interpreting any server number, validate zero global dropped actions,
+generator CPU below the 70% assigned-core guard, memory and VU headroom, no OOM or
+swap, and uninterrupted samples. The script rejects failed capacity/hold validity
+and saves `excluded.txt`; review the generator's raw memory/VU counters before
+accepting `summary.json`. Mark exclusions and their reasons here after review.
+
+Return both preparation and measurement folders, including commands, hashes, image
+IDs, summary, fixtures, copied stress directories, service logs, app inspection,
+and process status. Preserve the source DB/users pair and recording for the gate.
+
+```sh
+tar -czf /tmp/kit-baseline-ryzen.tgz -C perf/.cache kit-baseline
+```
+
+The earlier 24-process V8/Bun render comparison and cross-session `--reference`
+comparison are replaced by the quick A/B/A/B native gate. This full baseline keeps
+only the ramp and two RSS holds; it is not rerun at every refactor step.
+
 ## Acceptance criteria
 
 - [x] V8 measured on Linux in task 078's container limits: RSS at idle and under load,
@@ -491,7 +561,8 @@ gaps, with production-mode refusal checks and a shared write-limit switch.
 - [x] A memory target for the native backend with a renderer, agreed with Kait
 - [ ] Confirmed on the Linux host: the app's peak RSS with one renderer against the
       guideline, and V8's render CPU against Bun's plain bundle on the four pages, the
-      condition in native-rendering.md
+      condition in native-rendering.md. Deferred on 2026-10-08 until the port and
+      porting-kit refactor are complete; the Ryzen/WSL baseline below does not close it
 - [x] The decision recorded in `docs/architecture/` with what was rejected: shells
       (task 079), a separate Bun render process, and the other engines
 - [x] The renderer's harness kept where it can be re-run: `native/crates/render/`,

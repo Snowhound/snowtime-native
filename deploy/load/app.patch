@@ -39,15 +39,16 @@ index 0000000..6f4e76a
 +  retention: 168h
 diff --git a/deploy/compose/compose.bench.direct.yml b/deploy/compose/compose.bench.direct.yml
 new file mode 100644
-index 0000000..750410d
+index 0000000..a880aae
 --- /dev/null
 +++ b/deploy/compose/compose.bench.direct.yml
-@@ -0,0 +1,21 @@
+@@ -0,0 +1,22 @@
 +# Native TLS without reverse proxying. Caddy still exposes the sampler; k6 maps its
 +# requests straight to app:3000. The private bench network trusts the generator's fake IPs.
 +services:
 +  app:
 +    environment:
++      RATE_LIMIT: 'off'
 +      BETTER_AUTH_URL: https://snowtime-bench.test:3000
 +      TLS_CERT_FILE: /tls/cert.pem
 +      TLS_KEY_FILE: /tls/key.pem
@@ -77,19 +78,20 @@ index 0000000..c69e066
 +    volumes:
 +      - ${BENCH_CADDY_CONFIG:?Set BENCH_CADDY_CONFIG}:/etc/caddy/edge.json:ro
 diff --git a/deploy/compose/compose.bench.local.yml b/deploy/compose/compose.bench.local.yml
-index ea4a1e7..017ad97 100644
+index ea4a1e7..9e13119 100644
 --- a/deploy/compose/compose.bench.local.yml
 +++ b/deploy/compose/compose.bench.local.yml
-@@ -10,7 +10,7 @@ services:
+@@ -10,7 +10,8 @@ services:
      environment:
        # --smol, for an A/B run (perf:stress --smol).
        BUN_OPTIONS: ${BENCH_BUN_OPTIONS:-}
 -    cpuset: '1'
 +    cpuset: '${BENCH_APP_CPUSET:-1}'
++    cpus: '${BENCH_APP_CPUS:-0}'
      mem_limit: ${BENCH_APP_MEMORY:-1792m}
      memswap_limit: ${BENCH_APP_MEMORY:-1792m}
    caddy:
-@@ -29,8 +29,10 @@ services:
+@@ -29,8 +30,10 @@ services:
          aliases:
            - snowtime-bench.test
    sampler:
@@ -103,10 +105,10 @@ index ea4a1e7..017ad97 100644
      name: snowtime_bench_caddy_data
 diff --git a/deploy/compose/compose.bench.native.yml b/deploy/compose/compose.bench.native.yml
 new file mode 100644
-index 0000000..640ecca
+index 0000000..b3c7258
 --- /dev/null
 +++ b/deploy/compose/compose.bench.native.yml
-@@ -0,0 +1,19 @@
+@@ -0,0 +1,21 @@
 +# The native backend (task 081) in the app's place on the local bench stack, with the same
 +# database, limits, and environment. The host binary defaults to snowtime-axum;
 +# NATIVE_BIN overrides it when building: perf:stress --app=native adds this file.
@@ -114,6 +116,8 @@ index 0000000..640ecca
 +  app:
 +    image: snowtime-native:bench
 +    environment:
++      RATE_LIMIT: 'off'
++      RENDERERS: ${BENCH_RENDERERS:-}
 +      EDGE_COMPRESSION: 'false'
 +      EDGE_ACCESS_LOG: 'off'
 +      EDGE_HEADERS: 'false'
@@ -351,6 +355,39 @@ index 0000000..c7e806a
 +  }
 +}
 +writeFileSync(destination, JSON.stringify(config, null, 2))
+diff --git a/perf/stress/health.test.ts b/perf/stress/health.test.ts
+new file mode 100644
+index 0000000..18a511f
+--- /dev/null
++++ b/perf/stress/health.test.ts
+@@ -0,0 +1,9 @@
++import { expect, test } from 'bun:test'
++import { checkNativeBenchmarkHealth } from './health'
++
++test('requires the native host to confirm that rate limiting is off', () => {
++  expect(() => checkNativeBenchmarkHealth({ rate_limit: false })).not.toThrow()
++  for (const health of [{ rate_limit: true }, {}, null, { rate_limit: 'off' }]) {
++    expect(() => checkNativeBenchmarkHealth(health)).toThrow('RATE_LIMIT=off')
++  }
++})
+diff --git a/perf/stress/health.ts b/perf/stress/health.ts
+new file mode 100644
+index 0000000..64d0b9a
+--- /dev/null
++++ b/perf/stress/health.ts
+@@ -0,0 +1,12 @@
++export function checkNativeBenchmarkHealth(health: unknown) {
++  if (
++    typeof health !== 'object' ||
++    health === null ||
++    !('rate_limit' in health) ||
++    health.rate_limit !== false
++  ) {
++    throw new Error(
++      '[stress] Native benchmark requires rate_limit=false in /readyz; set RATE_LIMIT=off',
++    )
++  }
++}
 diff --git a/perf/stress/lock.test.ts b/perf/stress/lock.test.ts
 new file mode 100644
 index 0000000..4d61e39
@@ -492,6 +529,24 @@ index 0000000..912d90d
 +    metrics.dropped_iterations?.values.count ?? 0,
 +  )
 +}
+diff --git a/perf/stress/record.ts b/perf/stress/record.ts
+index dd16649..e754879 100644
+--- a/perf/stress/record.ts
++++ b/perf/stress/record.ts
+@@ -181,11 +181,11 @@ export async function record({
+     })
+     await context.addCookies([
+       {
+-        name: SESSION_COOKIE,
++        name: origin.startsWith('https:') ? SESSION_COOKIE : 'better-auth.session_token',
+         value: sessionCookie(user.token, secret),
+         domain: hostname,
+         path: '/',
+-        secure: true,
++        secure: origin.startsWith('https:'),
+         httpOnly: true,
+       },
+     ])
 diff --git a/perf/stress/sampler/main.go b/perf/stress/sampler/main.go
 index ced43e7..edb133e 100644
 --- a/perf/stress/sampler/main.go
@@ -733,10 +788,10 @@ index 0000000..6338ffe
 +	}
 +}
 diff --git a/perf/stress/scenario.js b/perf/stress/scenario.js
-index 0342983..46eeb73 100644
+index 0342983..e3dd05a 100644
 --- a/perf/stress/scenario.js
 +++ b/perf/stress/scenario.js
-@@ -17,6 +17,27 @@ import exec from 'k6/execution'
+@@ -17,11 +17,34 @@ import exec from 'k6/execution'
  import http from 'k6/http'
  import { Counter, Trend } from 'k6/metrics'
  
@@ -762,9 +817,18 @@ index 0342983..46eeb73 100644
 +      ]
 +
  const ORIGIN = __ENV.ORIGIN
- const HOST = ORIGIN.replace(/^https:\/\//, '')
+-const HOST = ORIGIN.replace(/^https:\/\//, '')
++const HOST = ORIGIN.replace(/^https?:\/\//, '')
  const SECRET = __ENV.SECRET
-@@ -43,13 +64,35 @@ const MIX = [
+ const PLAN = JSON.parse(__ENV.PLAN)
+-const SESSION_COOKIE = '__Secure-better-auth.session_token'
++const SESSION_COOKIE = ORIGIN.startsWith('https:')
++  ? '__Secure-better-auth.session_token'
++  : 'better-auth.session_token'
+ const LOCALE_COOKIE = 'PARAGLIDE_LOCALE'
+ const PASSWORD = 'snowtime-local'
+ 
+@@ -43,13 +66,35 @@ const MIX = [
  const ACTIONS_PER_HOUR = MIX.reduce((total, [, times]) => total + times, 0)
  
  const users = new SharedArray('users', () => JSON.parse(open(__ENV.USERS)))
@@ -800,7 +864,7 @@ index 0342983..46eeb73 100644
    if (isCall(request)) return `${action} api`
    if (request.path.startsWith('/api/auth/')) return `${action} auth`
    return `${action} page`
-@@ -74,9 +117,27 @@ for (const step of PLAN) {
+@@ -74,9 +119,27 @@ for (const step of PLAN) {
    for (const kind of KINDS) {
      thresholds[`http_req_duration{step:${step.name},kind:${kind}}`] = ['max>=0']
      thresholds[`http_reqs{step:${step.name},kind:${kind}}`] = ['count>=0']
@@ -828,7 +892,7 @@ index 0342983..46eeb73 100644
    thresholds[`bench_action_duration{step:${step.name}}`] = ['max>=0']
    for (const type of ['5xx', '429', '4xx', 'connection', 'timeout']) {
      thresholds[`bench_errors{step:${step.name},type:${type}}`] = ['count>=0']
-@@ -87,30 +148,51 @@ let start = 0
+@@ -87,30 +150,51 @@ let start = 0
  const scenarios = {}
  for (const step of PLAN) {
    const perHour = Math.max(1, Math.round(step.perHour ?? step.users * ACTIONS_PER_HOUR))
@@ -886,7 +950,7 @@ index 0342983..46eeb73 100644
    userAgent: 'snowtime-bench (k6)',
  }
  
-@@ -162,9 +244,13 @@ function classify(response) {
+@@ -162,9 +246,13 @@ function classify(response) {
  
  export function act() {
    const step = exec.scenario.name
@@ -902,7 +966,7 @@ index 0342983..46eeb73 100644
    const fresh = {}
    if (action === 'timer') {
      const running = started.get(index)
-@@ -178,7 +264,7 @@ export function act() {
+@@ -178,14 +266,14 @@ export function act() {
        started.set(index, fresh[0])
      }
    }
@@ -911,7 +975,15 @@ index 0342983..46eeb73 100644
    const jar = new http.CookieJar()
    // Without it, a page answers a user whose language isn't English with a redirect.
    jar.set(ORIGIN, LOCALE_COOKIE, user.locale)
-@@ -199,6 +285,7 @@ export function act() {
+   if (signedIn) {
+     const signature = crypto.hmac('sha256', SECRET, user.token, 'base64')
+     jar.set(ORIGIN, SESSION_COOKIE, encodeURIComponent(`${user.token}.${signature}`), {
+-      secure: true,
++      secure: ORIGIN.startsWith('https:'),
+     })
+   }
+   // A client address per user, which Caddy trusts from the load generator.
+@@ -199,6 +287,7 @@ export function act() {
        redirects: 0,
        headers: {
          ...request.headers,
@@ -919,7 +991,7 @@ index 0342983..46eeb73 100644
          Origin: ORIGIN,
          'CF-Connecting-IP': ip,
          'X-Bench-Kind': kind,
-@@ -212,6 +299,19 @@ export function act() {
+@@ -212,6 +301,19 @@ export function act() {
    }
  
    function check(response, request) {
@@ -939,7 +1011,7 @@ index 0342983..46eeb73 100644
      if (action === 'stop' && request.method === 'POST' && response.status === 404) return
      const type = classify(response)
      if (type) errors.add(1, { type, kind: kindOf(action, request) })
-@@ -221,6 +321,7 @@ export function act() {
+@@ -221,6 +323,7 @@ export function act() {
    // browser's refetches do.
    const requests = recording.actions[action].map((r) => ({
      ...r,
@@ -948,7 +1020,7 @@ index 0342983..46eeb73 100644
      body: r.body && fill(r.body, user, fresh).replace('snowtime-local', PASSWORD),
    }))
 diff --git a/perf/stress/stack.ts b/perf/stress/stack.ts
-index dfed44e..79e399a 100644
+index dfed44e..8c94c7a 100644
 --- a/perf/stress/stack.ts
 +++ b/perf/stress/stack.ts
 @@ -3,6 +3,7 @@
@@ -1098,10 +1170,10 @@ index dfed44e..79e399a 100644
 +  return `${result.stdout.trim()}:3000`
  }
 diff --git a/perf/stress/stress.ts b/perf/stress/stress.ts
-index 3de4136..44147f2 100644
+index 3de4136..d3529bd 100644
 --- a/perf/stress/stress.ts
 +++ b/perf/stress/stress.ts
-@@ -7,21 +7,24 @@
+@@ -7,21 +7,25 @@
  //   bun run perf:stress --dataset=M --run=kinds
  //   bun run perf:stress --dataset=M --run=overload --users=<knee>
  //   bun run perf:stress --remote --dataset=M --run=ramp
@@ -1122,6 +1194,7 @@ index 3de4136..44147f2 100644
  import { table } from '../checks/baseline'
  import { CACHE, ROOT } from '../lib/database'
  import { type BenchUser, DATASETS, type DatasetName, dataset } from './dataset'
++import { checkNativeBenchmarkHealth } from './health'
 +import { checkOtherSessions, reserveStack } from './lock'
 +import { droppedActions } from './metrics'
  import { type Recording, record } from './record'
@@ -1130,7 +1203,7 @@ index 3de4136..44147f2 100644
    K6_IMAGE,
    LOCAL_HOST,
    LOCAL_PORT,
-@@ -30,8 +33,11 @@ import {
+@@ -30,8 +34,11 @@ import {
    NETWORK,
    buildImages,
    compose,
@@ -1142,7 +1215,7 @@ index 3de4136..44147f2 100644
  } from './stack'
  
  // Server-side p95 targets in milliseconds (task 078, "Runs"), by request kind. Signing in
-@@ -55,7 +61,13 @@ const MAX_DISK_SHARE = 0.8
+@@ -55,7 +62,13 @@ const MAX_DISK_SHARE = 0.8
  
  const { values } = parseArgs({
    options: {
@@ -1156,7 +1229,7 @@ index 3de4136..44147f2 100644
      run: { type: 'string', default: 'fixed' },
      users: { type: 'string' },
      seconds: { type: 'string' },
-@@ -66,17 +78,41 @@ const { values } = parseArgs({
+@@ -66,17 +79,41 @@ const { values } = parseArgs({
      build: { type: 'boolean', default: true },
      load: { type: 'boolean', default: true },
      memory: { type: 'string' },
@@ -1198,7 +1271,7 @@ index 3de4136..44147f2 100644
  const name = values.dataset as DatasetName
  if (!DATASETS.includes(name)) throw new Error(`[stress] --dataset is one of ${DATASETS.join(', ')}`)
  
-@@ -109,7 +145,7 @@ const target: Target = values.remote
+@@ -109,7 +146,7 @@ const target: Target = values.remote
        remote: true,
      }
    : {
@@ -1207,7 +1280,7 @@ index 3de4136..44147f2 100644
        chromeAddress: `127.0.0.1:${LOCAL_PORT}`,
        secret: LOCAL_SECRET,
        samplerPassword: LOCAL_SAMPLER_PASSWORD,
-@@ -122,17 +158,28 @@ async function sampler<T>(path: string): Promise<T> {
+@@ -122,17 +159,28 @@ async function sampler<T>(path: string): Promise<T> {
    const { hostname } = new URL(target.origin)
    const port = target.remote ? 443 : LOCAL_PORT
    const address = target.remote ? target.address! : '127.0.0.1'
@@ -1242,7 +1315,7 @@ index 3de4136..44147f2 100644
      ],
      { stdout: 'pipe', stderr: 'pipe' },
    )
-@@ -141,6 +188,20 @@ async function sampler<T>(path: string): Promise<T> {
+@@ -141,6 +189,20 @@ async function sampler<T>(path: string): Promise<T> {
    return JSON.parse(text) as T
  }
  
@@ -1263,7 +1336,7 @@ index 3de4136..44147f2 100644
  interface Sample {
    t: number
    cpu: Record<string, number>
-@@ -149,7 +210,7 @@ interface Sample {
+@@ -149,7 +211,7 @@ interface Sample {
    diskUsed: number
    diskTotal: number
    files: Record<string, number>
@@ -1272,7 +1345,7 @@ index 3de4136..44147f2 100644
    readUsec: number
    // The app's process.memoryUsage() and how long it took to answer, on a bench deployment.
    heap?: { rss: number; heapTotal: number; heapUsed: number; external: number; answerMs: number }
-@@ -164,6 +225,7 @@ interface LoggedRequest {
+@@ -164,6 +226,7 @@ interface LoggedRequest {
    size: number
  }
  
@@ -1280,7 +1353,7 @@ index 3de4136..44147f2 100644
  let logOffset = 0
  const logged: LoggedRequest[] = []
  
-@@ -192,6 +254,10 @@ interface Step {
+@@ -192,6 +255,10 @@ interface Step {
    // One action alone, at this many per hour.
    action?: string
    perHour?: number
@@ -1291,7 +1364,7 @@ index 3de4136..44147f2 100644
  }
  
  interface StepResult {
-@@ -219,13 +285,18 @@ async function runK6(
+@@ -219,13 +286,18 @@ async function runK6(
      ORIGIN: target.origin,
      SECRET: target.secret,
      PLAN: JSON.stringify(plan),
@@ -1311,7 +1384,7 @@ index 3de4136..44147f2 100644
      '-v',
      `${join(ROOT, 'perf/stress')}:/scripts:ro`,
      '-v',
-@@ -239,6 +310,7 @@ async function runK6(
+@@ -239,6 +311,7 @@ async function runK6(
      '--no-usage-report',
      '/scripts/scenario.js',
    ]
@@ -1319,7 +1392,7 @@ index 3de4136..44147f2 100644
    const k6 = spawn('docker', args, { stdio: ['ignore', 'inherit', 'inherit'] })
    const exited = new Promise<number>((resolve) => k6.on('exit', (code) => resolve(code ?? 1)))
    let aborted: string | null = null
-@@ -254,6 +326,9 @@ async function runK6(
+@@ -254,6 +327,9 @@ async function runK6(
    } else {
      await exited
    }
@@ -1329,7 +1402,7 @@ index 3de4136..44147f2 100644
    const summary = JSON.parse(readFileSync(join(files.out, 'summary.json'), 'utf8')) as K6Summary
    return { summary, aborted }
  }
-@@ -278,28 +353,50 @@ function rates(samples: Sample[]) {
+@@ -278,28 +354,50 @@ function rates(samples: Sample[]) {
    const last = samples.at(-1)!
    const seconds = last.t - first.t || 1
    function container(name: string) {
@@ -1389,7 +1462,7 @@ index 3de4136..44147f2 100644
      }
    }
    const ticks = Object.keys(last.cpu).reduce((t, k) => t + last.cpu[k] - first.cpu[k], 0) || 1
-@@ -308,6 +405,8 @@ function rates(samples: Sample[]) {
+@@ -308,6 +406,8 @@ function rates(samples: Sample[]) {
      app: container('app'),
      caddy: container('caddy'),
      sampler: container('sampler'),
@@ -1398,7 +1471,7 @@ index 3de4136..44147f2 100644
      steal: (last.cpu.steal - first.cpu.steal) / ticks,
      memoryUsed: Math.max(...samples.map((s) => s.memTotal - s.memAvailable)),
      memTotal: last.memTotal,
-@@ -330,13 +429,23 @@ function heapStats(heaps: NonNullable<Sample['heap']>[]) {
+@@ -330,13 +430,23 @@ function heapStats(heaps: NonNullable<Sample['heap']>[]) {
    }
  }
  
@@ -1424,7 +1497,7 @@ index 3de4136..44147f2 100644
    const windows = new Map<string, number[]>()
    for (const r of requests) {
      const key = `${r.kind}|${Math.floor((r.t - start) / WINDOW_S)}`
-@@ -356,7 +465,7 @@ function misses(result: StepResult): string[] {
+@@ -356,7 +466,7 @@ function misses(result: StepResult): string[] {
    if (sent > 0 && failed / sent > MAX_ERROR_SHARE) {
      found.push(`${((failed / sent) * 100).toFixed(2)}% errors`)
    }
@@ -1433,7 +1506,7 @@ index 3de4136..44147f2 100644
    if (dropped > 0) found.push(`${dropped} dropped iterations (invalid run)`)
    return [...new Set(found)]
  }
-@@ -384,14 +493,23 @@ function report(result: StepResult): string {
+@@ -384,14 +494,23 @@ function report(result: StepResult): string {
    const sent = metric(summary, `http_reqs{step:${step.name}}`, 'count')
    const seconds = Math.max(
      1,
@@ -1460,7 +1533,7 @@ index 3de4136..44147f2 100644
    const rows = kinds.map((kind) => {
      const server = requests.filter((r) => r.kind === kind).map((r) => r.duration * 1000)
      function client(stat: string) {
-@@ -422,7 +540,7 @@ function report(result: StepResult): string {
+@@ -422,7 +541,7 @@ function report(result: StepResult): string {
    lines.push(`Errors: ${errors.join(', ') || 'none'}`)
    if (result.samples.length > 1) {
      const r = rates(result.samples)
@@ -1469,7 +1542,7 @@ index 3de4136..44147f2 100644
      lines.push(
        table(
          [
-@@ -434,13 +552,14 @@ function report(result: StepResult): string {
+@@ -434,13 +553,14 @@ function report(result: StepResult): string {
            'anon',
            'cache',
            'RSS',
@@ -1485,7 +1558,7 @@ index 3de4136..44147f2 100644
            const c = r[n]
            return [
              n,
-@@ -451,6 +570,7 @@ function report(result: StepResult): string {
+@@ -451,6 +571,7 @@ function report(result: StepResult): string {
              mb(c.anon),
              mb(c.file),
              mb(c.rss),
@@ -1493,7 +1566,7 @@ index 3de4136..44147f2 100644
              (c.read / 1e6).toFixed(2),
              (c.write / 1e6).toFixed(2),
              `${(c.cpuPressure * 100).toFixed(0)}%`,
-@@ -466,6 +586,9 @@ function report(result: StepResult): string {
+@@ -466,6 +587,9 @@ function report(result: StepResult): string {
          `host memory ${mb(r.memoryUsed)} of ${mb(r.memTotal)} MB; database ${mb(r.database)} MB; ` +
          `disk ${(r.diskShare * 100).toFixed(0)}%; OOM kills ${r.app.oomKills}`,
      )
@@ -1503,7 +1576,7 @@ index 3de4136..44147f2 100644
      if (r.heap) {
        const { peak, slowest, stalled } = r.heap
        lines.push(
-@@ -491,12 +614,28 @@ async function runPlan(plan: Step[], files: { recording: string; users: string;
+@@ -491,12 +615,28 @@ async function runPlan(plan: Step[], files: { recording: string; users: string;
    const began = Date.now() / 1000
    async function watch(): Promise<string | null> {
      await readLog()
@@ -1533,7 +1606,7 @@ index 3de4136..44147f2 100644
      // Any kind over its target for the last 30 seconds.
      const recent = logged.filter((r) => r.t > now - WINDOW_S - 5)
      for (const kind of new Set(recent.map((r) => r.kind))) {
-@@ -516,8 +655,8 @@ async function runPlan(plan: Step[], files: { recording: string; users: string;
+@@ -516,8 +656,8 @@ async function runPlan(plan: Step[], files: { recording: string; users: string;
    const results: StepResult[] = []
    for (const step of plan) {
      const requests = logged.filter((r) => r.step === step.name && r.t >= began)
@@ -1544,7 +1617,7 @@ index 3de4136..44147f2 100644
      const result: StepResult = {
        step,
        summary,
-@@ -529,6 +668,25 @@ async function runPlan(plan: Step[], files: { recording: string; users: string;
+@@ -529,6 +669,25 @@ async function runPlan(plan: Step[], files: { recording: string; users: string;
      const text = report(result)
      console.log(text)
      writeFileSync(join(files.out, `${step.name}.txt`), text)
@@ -1570,7 +1643,7 @@ index 3de4136..44147f2 100644
    }
    if (aborted) console.log(`[stress] Stopped early: ${aborted}`)
    return { results, aborted }
-@@ -542,38 +700,84 @@ async function idleMemory(): Promise<string> {
+@@ -542,38 +701,84 @@ async function idleMemory(): Promise<string> {
    const app = samples.at(-1)?.containers.app
    if (!app) return 'Idle: no samples'
    const text =
@@ -1665,12 +1738,48 @@ index 3de4136..44147f2 100644
    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
    const out = join(
      CACHE,
-@@ -582,8 +786,46 @@ async function main() {
+@@ -582,8 +787,82 @@ async function main() {
      `${stamp}-${name}-${values.run}${values.label ? `-${values.label}` : ''}`,
    )
    mkdirSync(out, { recursive: true })
 +  outputDirectory = out
 +  writeFileSync(join(out, 'settings.json'), JSON.stringify(values, null, 2))
++  if (app === 'native') {
++    const origin = new URL(target.origin)
++    const port = origin.port || '443'
++    const address = new URL(`http://${target.address ?? '127.0.0.1'}`)
++    const health = Bun.spawnSync(
++      [
++        ...(!target.remote ? ['docker', 'exec', 'snowtime-bench-app-1'] : []),
++        'curl',
++        '--silent',
++        '--show-error',
++        '--fail',
++        '--max-time',
++        '20',
++        '--noproxy',
++        '*',
++        ...(target.remote
++          ? [
++              '--connect-to',
++              `${origin.hostname}:${port}:${address.hostname}:${address.port || port}`,
++            ]
++          : []),
++        ...(target.insecure ? ['--insecure'] : []),
++        target.remote
++          ? `${target.origin}/readyz`
++          : `${values.direct ? 'https' : 'http'}://localhost:3000/readyz`,
++      ],
++      { stdout: 'pipe', stderr: 'pipe' },
++    )
++    const body = new TextDecoder().decode(health.stdout)
++    writeFileSync(join(out, 'native-health.json'), body)
++    if (health.exitCode !== 0)
++      throw new Error(
++        `[stress] Native /readyz preflight failed: ${new TextDecoder().decode(health.stderr)}`,
++      )
++    checkNativeBenchmarkHealth(JSON.parse(body))
++  }
 +  if (values['replica-dir'] && !target.remote && values.load) {
 +    console.log('[stress] Waiting for initial replication before measuring')
 +    const deadline = Date.now() + 15 * 60 * 1000
@@ -1713,7 +1822,7 @@ index 3de4136..44147f2 100644
    let recording: Recording
    if (values.recording) {
      recording = JSON.parse(readFileSync(values.recording, 'utf8')) as Recording
-@@ -602,7 +844,58 @@ async function main() {
+@@ -602,7 +881,58 @@ async function main() {
    const files = { recording: recordingFile, users: paths.users, out }
    const stepSeconds = Number(values['step-seconds'])
  
@@ -1773,7 +1882,7 @@ index 3de4136..44147f2 100644
      const usersCount = Number(values.users ?? (values.run === 'calibration' ? 100 : 200))
      await runPlan(
        [{ name: 'fixed', users: usersCount, seconds: Number(values.seconds ?? 300) }],
-@@ -615,8 +908,16 @@ async function main() {
+@@ -615,8 +945,16 @@ async function main() {
      if (from > 0) {
        console.log(`\n[stress] Warming up at ${Math.round(from / 2)} users for 30 s`)
        await runPlan([{ name: 'warmup', users: Math.round(from / 2), seconds: 30 }], files)
@@ -1790,7 +1899,7 @@ index 3de4136..44147f2 100644
      for (const [i, count] of steps.entries()) {
        const { results, aborted } = await runPlan(
          [{ name: `u${count}`, users: count, seconds: stepSeconds }],
-@@ -627,34 +928,65 @@ async function main() {
+@@ -627,34 +965,65 @@ async function main() {
          lastGood = count
          continue
        }
@@ -1862,7 +1971,7 @@ index 3de4136..44147f2 100644
    } else if (values.run === 'overload') {
      if (target.remote) throw new Error('[stress] Overload runs locally only.')
      const knee = Number(values.users ?? 0)
-@@ -669,7 +1001,7 @@ async function main() {
+@@ -669,7 +1038,7 @@ async function main() {
        files,
      )
    } else if (values.run === 'kinds') {
@@ -1871,7 +1980,7 @@ index 3de4136..44147f2 100644
      const perSecond = Number(values.users ?? 2)
      const actions = [
        'open',
-@@ -687,9 +1019,34 @@ async function main() {
+@@ -687,9 +1056,34 @@ async function main() {
          (a) => (recording.actions[a as keyof Recording['actions']] ?? []).length > 0,
        ),
      )
@@ -1908,7 +2017,7 @@ index 3de4136..44147f2 100644
          users: 0,
          seconds: Number(values.seconds ?? 60),
          action,
-@@ -698,21 +1055,32 @@ async function main() {
+@@ -698,21 +1092,32 @@ async function main() {
        files,
      )
      const rows = results.map((r) => {
@@ -1945,7 +2054,7 @@ index 3de4136..44147f2 100644
        rows,
      )
      console.log(`\n${text}`)
-@@ -723,4 +1091,50 @@ async function main() {
+@@ -723,4 +1128,62 @@ async function main() {
    console.log(`\n[stress] Results in ${relative(ROOT, out)}`)
  }
  
@@ -1957,6 +2066,18 @@ index 3de4136..44147f2 100644
 +  await main()
 +} finally {
 +  if (!target.remote && outputDirectory) {
++    if (app === 'native') {
++      const status = spawnSync(
++        'docker',
++        ['exec', 'snowtime-bench-app-1', 'cat', '/proc/1/status'],
++        {
++          encoding: 'utf8',
++        },
++      )
++      writeFileSync(join(outputDirectory, 'app.proc-status.txt'), status.stdout + status.stderr)
++      const config = spawnSync('docker', ['inspect', 'snowtime-bench-app-1'], { encoding: 'utf8' })
++      writeFileSync(join(outputDirectory, 'app.inspect.json'), config.stdout)
++    }
 +    for (const service of [
 +      'app',
 +      'caddy',

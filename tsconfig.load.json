@@ -1,0 +1,6 @@
+{
+  // The load scripts, checked with deploy/load/app.patch applied to app/.
+  "extends": "./tsconfig.json",
+  "include": ["harness/scaling/*.ts", "harness/perf-gate.ts"],
+  "exclude": ["**/node_modules"]
+}
