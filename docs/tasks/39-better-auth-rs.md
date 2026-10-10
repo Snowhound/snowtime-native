@@ -1,6 +1,6 @@
 # 081.39: Auth through better-auth-rs, with passkeys beside it
 
-Status: in progress (2026-10-10): sign-out, OAuth, and API key creation on the library; the measurements next
+Status: in progress (2026-10-10): sign-out, OAuth, and API key creation on the library; the gate passed except binary size; the choice between better-auth-rs and an 081.28 kit crate is Kait's
 
 Move the port's auth onto better-auth-rs, the intended library ([question 5](README.md),
 Kait, 2026-10-06), on a branch, and measure what it costs. This applies the kit's auth
@@ -172,10 +172,38 @@ stripped release `bench` binary on macOS arm64 is 78,072,464 bytes, up 4,119,808
 from `47b74fc`. The bar is unchanged after both: conformance 66/570/13, `compare.ts` 1,490,
 server 128, host 36, Clippy both ways.
 
+### Performance gate
+
+`perf-gate.ts --build-current` at `11220ac` (fork `796d9d91`), then the gate with the `mac`
+profile against the baseline frozen at `5a5cb9b`; evidence in
+`app/perf/.cache/native-gate/runs/2026-10-10T11-13-07.546Z`. The images can't reach the fork
+beside the repository, so the gate exports its committed tree and passes it as a named
+build context, which `deploy/Dockerfile` and `adapter/bench/Dockerfile` copy to
+`/better-auth-rs` (an empty stage otherwise).
+
+Every render, API, and load metric passes. The one flag is binary size, which doesn't vary
+between runs, so it wasn't repeated:
+
+| Metric                       |   Baseline |    Current | Delta | Band | Gate       |
+| ---------------------------- | ---------: | ---------: | ----: | ---: | ---------- |
+| render/timer/cpu_ms          |     14.939 |     14.696 | -1.6% | 1.49 | pass       |
+| render/year/p95_ms           |     27.285 |     30.128 | 10.4% | 5.71 | pass       |
+| render/\*/peak_rss_mb        |    212.184 |    230.910 |  8.8% | 18.7 | pass       |
+| api/session/cpu_ms           |      0.120 |      0.130 |  8.3% | 0.02 | pass       |
+| api/entries/cpu_ms           |      0.430 |      0.440 |  2.3% | 0.02 | pass       |
+| load/cpu_ms                  |      0.698 |      0.706 |  1.2% | 0.04 | pass       |
+| load/peak_rss_mib            |     48.852 |     50.914 |  4.2% |  4.0 | pass       |
+| static/binary_bytes          | 80,729,920 | 84,924,952 |  5.2% | 5.0% | REGRESSION |
+| static/render_bundle_bytes   |  2,001,714 |  2,001,714 |  0.0% |      | pass       |
+
+The rows left out are within 6% and their bands. The render harness's peak RSS rises
+by about 19 MB in all four pages, inside the band; the load server's by 2 MiB. The size
+comes from the library's plugins and CLI the port doesn't mount (above). The full kit
+baseline hasn't run.
+
 ### Next
 
-1. Apply `deploy/load/app.patch`, `bun harness/perf-gate.ts --build-current`, then
-   `caffeinate -i bun harness/perf-gate.ts`; record the table and flags here, repeat a
-   flag in an idle session, and restore `app/`.
-2. Nothing is pushed, here or in the fork, until the perf and memory runs (Kait,
-   2026-10-10).
+1. Kait decides: keep better-auth-rs, accepting the 5.2% binary size (or trim the
+   library's unmounted plugins behind features in the fork), or promote 081.28's port
+   to a kit crate. Organizations, invitations, and profile writes stay app code either way.
+2. Nothing is pushed, here or in the fork, until Kait approves (2026-10-10).
