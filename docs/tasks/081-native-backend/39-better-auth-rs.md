@@ -3,16 +3,24 @@
 Status: todo
 
 Move the port's auth onto better-auth-rs, the intended library ([question 5](README.md),
-Kait, 2026-10-06), on a branch, and measure what it costs. Three parts stay app code
-(Kait, 2026-10-10): the passkey module, the per-request signed-cookie check, and AWS-LC
-scrypt sign-in. The passkey module (`crates/server/src/auth/passkeys.rs`, 081.28) uses
-`webauthn-rs-core` with TypeScript's preferred user-verification policy; the library's
-passkey plugin requires verification, so a registration TypeScript accepts fails there
-([spike](auth-spike.md), adoption gate 2). Keeping the module beside the library removes
-that gate. Published `1.0.0-alpha.3` targets better-auth 1.6.29; the library's `master`
-targets 1.7.6 since 2026-09-30, with typed server-only API-key operations (adoption gate
-1); the app runs 1.7.7. Branch `081-auth-spike` in snowtime holds the spike's store and
-ceremony tests.
+Kait, 2026-10-06), on a branch, and measure what it costs. This applies the kit's auth
+recipe ([05](05-porting-recipes.md), Kait, 2026-10-08): the library serves the flows,
+its gaps are fixed in a fork and offered upstream, what it lacks goes in a crate beside
+it, and 081.28's hand-ported flows are the fallback for gaps.
+
+Passkeys are such a gap. The library's passkey plugin requires user verification, so a
+registration TypeScript accepts fails there ([spike](auth-spike.md), adoption gate 2).
+Here the app's passkey module (`crates/server/src/auth/passkeys.rs`, 081.28, on
+`webauthn-rs-core` with TypeScript's preferred policy) stays beside the library (Kait,
+2026-10-10), and the policy fix is offered upstream. The per-request signed-cookie check
+and AWS-LC scrypt sign-in also stay app code. This is a separate bug from snowtime's task
+092, whose patch answers a malformed registration with 400 instead of Better Auth's 500.
+
+Published `1.0.0-alpha.3` targets better-auth 1.6.29; the library's `master` targets
+1.7.6 since 2026-09-30, with typed server-only API-key operations (adoption gate 1); the
+app runs 1.7.7. The spike's store and ceremony tests are in snowtime's `081-native-poc`
+history at `ae0ec17`, before 081.37 removed them; branch `081-auth-spike` no longer
+exists.
 
 ## Acceptance criteria
 
@@ -26,7 +34,8 @@ ceremony tests.
       2026-10-02), organizations and invitations, and API keys through its server-only
       operations, with its HTTP key endpoints closed.
 - [ ] Passkeys stay in `auth/passkeys.rs` on the same tables, with the library's plugin
-      unmounted. The cookie check and AWS-LC scrypt sign-in stay app code.
+      unmounted, and an issue or pull request upstream for the verification policy. The
+      cookie check and AWS-LC scrypt sign-in stay app code.
 - [ ] The app's policies hold: name checks, `ALLOWED_LOGIN_DOMAINS`, refusing unverified
       sign-ups, and the rate-limit rules, as library hooks or around it.
 - [ ] The bar passes unchanged: conformance (66 tests, 570 assertions, 13 files),
