@@ -1,6 +1,7 @@
 # Checks the port on every PR and push to main: formatting, Clippy with and without bench,
-# the Rust and adapter tests, cargo-deny, cargo-audit, and whether THIRD_PARTY_LICENSES is
-# current. On a PR that leaves the app's pin alone, page-compare.ts also renders every page
+# the Rust, adapter, and harness tests, the parity bar (conformance, compare.ts, and
+# hardening-compare.ts against a bench build), the load patch against the pinned app,
+# cargo-deny, cargo-audit, and whether THIRD_PARTY_LICENSES is current. On a PR that leaves the app's pin alone, page-compare.ts also renders every page
 # on the base commit's host and this one and fails on any difference.
 name: Check
 
@@ -55,11 +56,11 @@ jobs:
           (cd app && bun --bun run build)
           bun adapter/build.ts
 
-      - name: TypeScript and adapter tests
+      - name: TypeScript, adapter, and harness tests
         run: |
           bun install --cwd adapter/bench --frozen-lockfile
           bunx tsc --noEmit -p .
-          bun test adapter
+          bun test adapter harness
 
       - name: Format
         run: cargo fmt --all -- --check
@@ -76,6 +77,25 @@ jobs:
           cargo test --locked -p snowtime-server --features bench
           cargo test --locked -p snowtime-host
           cargo test --locked -p snowtime-render
+
+      # The bar the pin must pass (README, "Run it"): the app's conformance tests and the
+      # port's, then byte comparisons against the app's TypeScript build.
+      - name: Parity with the app
+        run: |
+          cargo build --locked -p snowtime-host --features bench
+          bun harness/conformance.ts target/debug/snowtime-axum
+          bun harness/compare.ts target/debug/snowtime-axum
+          bun harness/hardening-compare.ts target/debug/snowtime-axum
+
+      # deploy/load/app.patch must still apply to the pinned app, type-check, and pass its
+      # tests; app/ is restored after, so later steps see the pinned commit.
+      - name: Load patch
+        run: |
+          git -C app apply ../deploy/load/app.patch
+          bunx tsc --noEmit -p tsconfig.load.json
+          (cd app && bun test perf/stress)
+          git -C app checkout -- .
+          git -C app clean -fd -- perf deploy
 
       - name: cargo-deny
         run: |
