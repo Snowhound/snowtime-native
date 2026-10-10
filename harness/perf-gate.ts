@@ -37,8 +37,8 @@ if (values.help) {
 }
 const profile = PROFILES[values.profile]
 if (!profile) throw new Error(`Unknown profile ${values.profile}`)
-values.renders ??= String(profile.renders)
-for (const value of [values.renders, values.repeats, values.rate])
+const renders = values.renders ?? String(profile.renders)
+for (const value of [renders, values.repeats, values.rate])
   if (!Number.isInteger(Number(value)) || Number(value) < 1)
     throw new Error('Counts and rate must be positive integers')
 const PORT = resolve(import.meta.dir, '..')
@@ -210,7 +210,9 @@ async function replay(server: { url: string; pid: number }, round: string) {
   // below read handleSummary's shape, which nests them under `values`.
   const summary = {
     metrics: Object.fromEntries(
-      Object.entries(json(summaryPath).metrics).map(([name, values]) => [name, { values }]),
+      Object.entries(json(summaryPath).metrics as Record<string, Record<string, number>>).map(
+        ([name, values]) => [name, { values }],
+      ),
     ),
   }
   const requests = summary.metrics.http_reqs?.values?.count ?? 0
@@ -283,7 +285,7 @@ async function inside() {
           [
             join(inputs, `${page}.json`),
             join(inputs, 'answers.json'),
-            values.renders,
+            renders,
             '1',
             '1',
             join(out, `${round}-${page}.html`),
@@ -405,7 +407,7 @@ async function main() {
         '--identical',
         `--out=${folder}`,
         `--profile=${values.profile}`,
-        `--renders=${values.renders}`,
+        `--renders=${renders}`,
         `--repeats=${values.repeats}`,
         `--rate=${values.rate}`,
       ]
@@ -597,7 +599,7 @@ async function main() {
         program: 'docker',
         limits: { cpus: 1, cpuset: profile.cpuset, memory: '2g', swap: 'disabled' },
         profile: values.profile,
-        renders: values.renders,
+        renders,
         repeats: values.repeats,
         rate: values.rate,
         started: new Date().toISOString(),
@@ -616,7 +618,7 @@ async function main() {
           'snowtime-perf-gate:runtime',
           `--out=/repo/${relative(PORT, out)}`,
           `--profile=${values.profile}`,
-          `--renders=${values.renders}`,
+          `--renders=${renders}`,
           `--repeats=${values.repeats}`,
           `--rate=${values.rate}`,
           ...(values.identical ? ['--identical'] : []),
