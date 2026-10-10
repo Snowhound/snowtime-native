@@ -43,7 +43,9 @@ middleware and Better Auth's error page, and their differences from TypeScript.
 [Task 081.38](docs/tasks/38-api-keys.md) records personal API keys and
 their differences from TypeScript. The records keep the paths of the snowtime branch they
 were written on: `native/crates/` is now `crates/`, `native/bench/` is `harness/`, and
-`native/crates/render/bundle/` is `adapter/`.
+`native/crates/render/bundle/` is `adapter/`. The snowtime branches they name were removed
+on 2026-10-10; their commits stay reachable through the tags `archive/081-native-poc`,
+`archive/081-linux-confirmation`, and `archive/081-report-reads` in snowtime.
 
 ## Crates
 

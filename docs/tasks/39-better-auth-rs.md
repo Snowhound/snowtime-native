@@ -16,11 +16,10 @@ Here the app's passkey module (`crates/server/src/auth/passkeys.rs`, 081.28, on
 and AWS-LC scrypt sign-in also stay app code. This is a separate bug from snowtime's task
 092, whose patch answers a malformed registration with 400 instead of Better Auth's 500.
 
-Published `1.0.0-alpha.3` targets better-auth 1.6.29; the library's `master` targets
-1.7.6 since 2026-09-30, with typed server-only API-key operations (adoption gate 1); the
-app runs 1.7.7. The spike's store and ceremony tests are in snowtime's `081-native-poc`
-history at `ae0ec17`, before 081.37 removed them; branch `081-auth-spike` no longer
-exists.
+Published `1.0.0-alpha.3` targets better-auth 1.6.29; the library's `master` targets 1.7.6
+since 2026-09-30, with typed server-only API-key operations (adoption gate 1); the app
+runs 1.7.7. The spike's store and ceremony tests are at `ae0ec17` in snowtime, reachable
+from the tag `archive/081-native-poc`, before 081.37 removed them.
 
 ## Acceptance criteria
 
