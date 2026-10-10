@@ -44,3 +44,19 @@ test('Server-Timing tolerates one resolution step above zero', () => {
     expect(compareMetric([10, 10], [10.6, 10.6], metric).flagged).toBe(true)
   }
 })
+
+test('a profile widens the floor for render CPU and p50 only', () => {
+  for (const metric of ['render/week/cpu_ms', 'render/week/p50_ms']) {
+    expect(compareMetric([100, 100], [110, 110], metric, { render: 0.1 }).flagged).toBe(false)
+    expect(compareMetric([100, 100], [111, 111], metric, { render: 0.1 }).flagged).toBe(true)
+  }
+  expect(compareMetric([100, 100], [106, 106], 'api/timer/cpu_ms', { render: 0.1 }).flagged).toBe(
+    true,
+  )
+})
+test('CPU counted in clock ticks has a floor of its resolution', () => {
+  // One 10 ms tick over 1,000 calls.
+  const floors = { resolution: 0.01 }
+  expect(compareMetric([0.04, 0.04], [0.05, 0.05], 'api/timer/cpu_ms', floors).flagged).toBe(false)
+  expect(compareMetric([0.04, 0.04], [0.051, 0.051], 'api/timer/cpu_ms', floors).flagged).toBe(true)
+})

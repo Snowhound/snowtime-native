@@ -94,5 +94,7 @@ export function processUsage(pid: number) {
     peakMiB: kib('VmHWM') / 1024,
     rssMiB: kib('VmRSS') / 1024,
     swapKiB: kib('VmSwap'),
+    // The resolution of cpuMs: /proc counts CPU in clock ticks.
+    tickMs: 1000 / ticksPerSecond,
   }
 }

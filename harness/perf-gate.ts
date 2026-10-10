@@ -10,6 +10,7 @@ import { droppedActions } from '../app/perf/stress/metrics'
 import { LOCAL_SECRET } from '../app/perf/stress/stack'
 import { machineCommands } from './gate/machine'
 import { compareMetric } from './gate/metrics'
+import { defaultProfile, PROFILES } from './gate/profiles'
 import { processUsage, startNative } from './native'
 import { nativeHotTimings } from './timings'
 
@@ -22,23 +23,29 @@ const { values } = parseArgs({
     calibrate: { type: 'boolean', default: false },
     help: { type: 'boolean', default: false },
     out: { type: 'string' },
-    renders: { type: 'string', default: '25' },
+    profile: { type: 'string', default: defaultProfile() },
+    renders: { type: 'string' },
     repeats: { type: 'string', default: '1000' },
     rate: { type: 'string', default: '30' },
   },
 })
 if (values.help) {
   console.log(
-    'perf-gate.ts --freeze | --build-current | --calibrate | [--identical --renders=25 --repeats=1000 --rate=30]',
+    `perf-gate.ts --freeze | --build-current | --calibrate | [--identical] [--profile=${Object.keys(PROFILES).join('|')} --renders=N --repeats=1000 --rate=30]`,
   )
   process.exit(0)
 }
+const profile = PROFILES[values.profile]
+if (!profile) throw new Error(`Unknown profile ${values.profile}`)
+values.renders ??= String(profile.renders)
 for (const value of [values.renders, values.repeats, values.rate])
   if (!Number.isInteger(Number(value)) || Number(value) < 1)
     throw new Error('Counts and rate must be positive integers')
 const PORT = resolve(import.meta.dir, '..')
 const gate = join(CACHE, 'native-gate')
 const MODULES_VOLUME = 'snowtime-perf-gate-node-modules'
+// Calibration stops here rather than retrying while the noise keeps flagging metrics.
+const MAXIMUM_ATTEMPTS = 6
 const out = values.out ?? join(gate, 'runs', new Date().toISOString().replaceAll(':', '-'))
 mkdirSync(out, { recursive: true })
 const commands: unknown[] = []
@@ -247,13 +254,21 @@ async function replay(server: { url: string; pid: number }, round: string) {
     throw new Error(
       `${round}: invalid generator/replay (exit=${code}, requests=${requests}, max generator CPU=${maximumCpu}, elapsed=${elapsed})`,
     )
-  return { cpu_ms: (after.cpuMs - before.cpuMs) / requests, peak_rss_mib: after.peakMiB }
+  return {
+    metrics: { cpu_ms: (after.cpuMs - before.cpuMs) / requests, peak_rss_mib: after.peakMiB },
+    cpuResolution: after.tickMs / requests,
+  }
 }
 async function inside() {
   // Without scripts: the app's prepare hook would install git hooks in the host's checkout.
   command('bun', ['install', '--frozen-lockfile', '--ignore-scripts'], 'install.log', {}, ROOT)
   const inputs = join(gate, 'inputs')
   const all: Record<string, Record<string, number>> = {}
+  // The coarsest /proc resolution each CPU metric had in any round.
+  const resolutions: Record<string, number> = {}
+  function resolution(metric: string, value: number) {
+    resolutions[metric] = Math.max(resolutions[metric] ?? 0, value)
+  }
   for (const [index, name] of ['baseline', 'current', 'baseline', 'current'].entries()) {
     const round = `${index + 1}-${name}`
     const artifact = join(gate, values.identical ? 'baseline' : name)
@@ -299,9 +314,11 @@ async function inside() {
         Number(values.repeats),
       )
       writeFileSync(join(out, `${round}-api.json`), JSON.stringify(result, null, 2))
-      for (const [call, times] of Object.entries(result))
+      for (const [call, times] of Object.entries(result)) {
         for (const [metric, value] of Object.entries(times))
           metrics[`api/${call}/${metric}`] = value
+        resolution(`api/${call}/cpu_ms`, processUsage(process.pid).tickMs / Number(values.repeats))
+      }
     } finally {
       await api.stop()
     }
@@ -311,7 +328,9 @@ async function inside() {
     })
     try {
       const result = await replay(load, round)
-      for (const [metric, value] of Object.entries(result)) metrics[`load/${metric}`] = value
+      for (const [metric, value] of Object.entries(result.metrics))
+        metrics[`load/${metric}`] = value
+      resolution('load/cpu_ms', result.cpuResolution)
     } finally {
       await load.stop()
     }
@@ -327,6 +346,7 @@ async function inside() {
         [all['1-baseline'][metric], all['3-baseline'][metric]],
         [all['2-current'][metric], all['4-current'][metric]],
         metric,
+        { render: profile.renderFloor, resolution: resolutions[metric] },
       ),
     ]),
   )
@@ -358,7 +378,9 @@ async function main() {
           {
             status,
             identical: true,
+            profile: values.profile,
             requiredConsecutivePasses: 2,
+            maximumAttempts: MAXIMUM_ATTEMPTS,
             consecutivePasses: streak,
             attempts,
           },
@@ -369,11 +391,20 @@ async function main() {
     }
     recordCalibration('running')
     while (streak < 2) {
+      if (attempts.length === MAXIMUM_ATTEMPTS) {
+        recordCalibration('failed')
+        console.error(
+          `No two consecutive passes in ${MAXIMUM_ATTEMPTS} attempts; the noise exceeds this profile's floors. Evidence: ${out}`,
+        )
+        process.exitCode = 1
+        return
+      }
       const folder = join(out, `attempt-${attempts.length + 1}`)
       const args = [
         'harness/perf-gate.ts',
         '--identical',
         `--out=${folder}`,
+        `--profile=${values.profile}`,
         `--renders=${values.renders}`,
         `--repeats=${values.repeats}`,
         `--rate=${values.rate}`,
@@ -564,7 +595,8 @@ async function main() {
       console.log('[gate] Starting retained baseline/current A/B/A/B; no builds during this run')
       commands.push({
         program: 'docker',
-        limits: { cpus: 1, cpuset: '0', memory: '2g', swap: 'disabled' },
+        limits: { cpus: 1, cpuset: profile.cpuset, memory: '2g', swap: 'disabled' },
+        profile: values.profile,
         renders: values.renders,
         repeats: values.repeats,
         rate: values.rate,
@@ -577,12 +609,13 @@ async function main() {
           'run',
           '--rm',
           '--cpus=1',
-          '--cpuset-cpus=0',
+          `--cpuset-cpus=${profile.cpuset}`,
           '--memory=2g',
           '--memory-swap=2g',
           ...modules,
           'snowtime-perf-gate:runtime',
           `--out=/repo/${relative(PORT, out)}`,
+          `--profile=${values.profile}`,
           `--renders=${values.renders}`,
           `--repeats=${values.repeats}`,
           `--rate=${values.rate}`,
