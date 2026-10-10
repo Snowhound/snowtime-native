@@ -8,3 +8,6 @@
 /crates/render/results/
 __pycache__/
 .DS_Store
+
+# Session notes and handovers, not committed
+/temp/
