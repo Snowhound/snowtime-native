@@ -260,8 +260,6 @@ async function replay(server: { url: string; pid: number }, round: string) {
   }
 }
 async function inside() {
-  // Without scripts: the app's prepare hook would install git hooks in the host's checkout.
-  command('bun', ['install', '--frozen-lockfile', '--ignore-scripts'], 'install.log', {}, ROOT)
   const inputs = join(gate, 'inputs')
   const all: Record<string, Record<string, number>> = {}
   // The coarsest /proc resolution each CPU metric had in any round, doubled: each round's
