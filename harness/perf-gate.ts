@@ -538,6 +538,25 @@ async function main() {
         .split('\n')
         .filter((name) => /^snowtime-bench-(app|caddy|sampler|litestream)-1$/.test(name))
       if (running.length) command('docker', ['stop', ...running], 'stop-bench-stack.log')
+      // The app's packages for Linux, over the host's, which may be macOS builds. They're
+      // installed before the measured container starts, since its script imports them.
+      // Without scripts: the app's prepare hook would install git hooks in the host's checkout.
+      const modules = ['-v', `${PORT}:/repo`, '-v', `${MODULES_VOLUME}:/repo/app/node_modules`]
+      command(
+        'docker',
+        [
+          'run',
+          '--rm',
+          ...modules,
+          '--workdir=/repo/app',
+          '--entrypoint=bun',
+          'snowtime-perf-gate:runtime',
+          'install',
+          '--frozen-lockfile',
+          '--ignore-scripts',
+        ],
+        'modules-install.log',
+      )
       const started = Date.now()
       console.log('[gate] Starting retained baseline/current A/B/A/B; no builds during this run')
       commands.push({
@@ -558,11 +577,7 @@ async function main() {
           '--cpuset-cpus=0',
           '--memory=2g',
           '--memory-swap=2g',
-          '-v',
-          `${PORT}:/repo`,
-          // The app's packages for Linux, over the host's, which may be macOS builds.
-          '-v',
-          `${MODULES_VOLUME}:/repo/app/node_modules`,
+          ...modules,
           'snowtime-perf-gate:runtime',
           `--out=/repo/${relative(PORT, out)}`,
           `--renders=${values.renders}`,
@@ -574,14 +589,18 @@ async function main() {
       )
       writeFileSync(join(out, 'gate.log'), result.stdout + result.stderr)
       writeFileSync(join(out, 'elapsed-seconds.txt'), `${(Date.now() - started) / 1000}\n`)
-      if (result.status !== 0 && result.status !== 1 && !existsSync(join(out, 'excluded.txt')))
+      // Bun exits 1 on an uncaught error too, so only a finished comparison makes 1 a regression.
+      const compared =
+        result.status === 0 ||
+        (result.status === 1 && existsSync(join(out, 'comparison.json')))
+      if (!compared && !existsSync(join(out, 'excluded.txt')))
         writeFileSync(
           join(out, 'excluded.txt'),
           `Gate container exited ${result.status}; see gate.log\n`,
         )
       console.log(result.stdout)
       if (result.stderr) console.error(result.stderr)
-      process.exitCode = result.status ?? 1
+      process.exitCode = compared ? result.status! : 2
     }
   } finally {
     release()
