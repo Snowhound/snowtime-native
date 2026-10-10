@@ -158,7 +158,9 @@ try {
           '1',
           '--max-time',
           '10',
-          'https://snowtime-bench.test:8443',
+          // Caddy answers this probe path itself; a proxied path waits 30 seconds
+          // (lb_try_duration) for the app, which isn't started here.
+          'https://snowtime-bench.test:8443/xmlrpc.php',
         ],
         'certificate-handshake.log',
       )
