@@ -1,6 +1,6 @@
 # 081.39: Auth through better-auth-rs, with passkeys beside it
 
-Status: in progress (2026-10-10): sign-out, OAuth, and API key creation on the library; the gate passed except binary size; the choice between better-auth-rs and an 081.28 kit crate is Kait's
+Status: in progress (2026-10-10): sign-out, OAuth, and API key creation on the library; the gate passed except binary size; keeping better-auth-rs; trimming the fork next
 
 Move the port's auth onto better-auth-rs, the intended library ([question 5](README.md),
 Kait, 2026-10-06), on a branch, and measure what it costs. This applies the kit's auth
@@ -212,7 +212,17 @@ this branch keeps. Forward-port any app features added since by rerunning the ba
 
 ### Next
 
-1. Kait decides: keep better-auth-rs, accepting the 5.2% binary size (or trim the
-   library's unmounted plugins behind features in the fork), or promote 081.28's port
-   to a kit crate. Organizations, invitations, and profile writes stay app code either way.
-2. Nothing is pushed, here or in the fork, until Kait approves (2026-10-10).
+Kait chose (2026-10-10) to keep better-auth-rs, with organizations, invitations, and
+profile writes, passkeys, and password sign-in as app code beside it.
+
+1. Trim the fork: put the plugins and CLI the port doesn't mount behind features (two-factor,
+   device codes, the CLI's `clap` and `serde_yaml`, `totp-rs`, `aes-gcm`, and others the
+   graph shows), with the library's defaults unchanged. Rerun the bar, the compatibility
+   harness, `--build-current`, and the gate; record the binary size.
+2. With Kait's approval: file the upstream pull requests and the OAuth state issue
+   ([upstream.md](better-auth-rs/upstream.md)), push the fork, and point the `[patch]`
+   at its URL and commit so CI builds the branch.
+3. Write the kit's auth recipe: the library for sessions, OAuth, and API key creation;
+   app code for organizations, passkeys, and password sign-in.
+4. If upstream hasn't engaged with the OAuth state issue after a few weeks, reconsider
+   promoting 081.28's port to a kit crate (Rollback above).
