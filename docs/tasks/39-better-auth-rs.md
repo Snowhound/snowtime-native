@@ -1,6 +1,6 @@
 # 081.39: Auth through better-auth-rs, with passkeys beside it
 
-Status: in progress (2026-10-10): sign-out, OAuth, and API key creation on the library; the gate passed except binary size; keeping better-auth-rs; trimming the fork next
+Status: in progress (2026-10-10): sign-out, OAuth, and API key creation on the library; the fork trimmed and the gate passing; upstream and push wait for Kait's approval
 
 Move the port's auth onto better-auth-rs, the intended library ([question 5](README.md),
 Kait, 2026-10-06), on a branch, and measure what it costs. This applies the kit's auth
@@ -184,22 +184,68 @@ build context, which `deploy/Dockerfile` and `adapter/bench/Dockerfile` copy to
 Every render, API, and load metric passes. The one flag is binary size, which doesn't vary
 between runs, so it wasn't repeated:
 
-| Metric                       |   Baseline |    Current | Delta | Band | Gate       |
-| ---------------------------- | ---------: | ---------: | ----: | ---: | ---------- |
-| render/timer/cpu_ms          |     14.939 |     14.696 | -1.6% | 1.49 | pass       |
-| render/year/p95_ms           |     27.285 |     30.128 | 10.4% | 5.71 | pass       |
-| render/\*/peak_rss_mb        |    212.184 |    230.910 |  8.8% | 18.7 | pass       |
-| api/session/cpu_ms           |      0.120 |      0.130 |  8.3% | 0.02 | pass       |
-| api/entries/cpu_ms           |      0.430 |      0.440 |  2.3% | 0.02 | pass       |
-| load/cpu_ms                  |      0.698 |      0.706 |  1.2% | 0.04 | pass       |
-| load/peak_rss_mib            |     48.852 |     50.914 |  4.2% |  4.0 | pass       |
-| static/binary_bytes          | 80,729,920 | 84,924,952 |  5.2% | 5.0% | REGRESSION |
-| static/render_bundle_bytes   |  2,001,714 |  2,001,714 |  0.0% |      | pass       |
+| Metric                     |   Baseline |    Current | Delta | Band | Gate       |
+| -------------------------- | ---------: | ---------: | ----: | ---: | ---------- |
+| render/timer/cpu_ms        |     14.939 |     14.696 | -1.6% | 1.49 | pass       |
+| render/year/p95_ms         |     27.285 |     30.128 | 10.4% | 5.71 | pass       |
+| render/\*/peak_rss_mb      |    212.184 |    230.910 |  8.8% | 18.7 | pass       |
+| api/session/cpu_ms         |      0.120 |      0.130 |  8.3% | 0.02 | pass       |
+| api/entries/cpu_ms         |      0.430 |      0.440 |  2.3% | 0.02 | pass       |
+| load/cpu_ms                |      0.698 |      0.706 |  1.2% | 0.04 | pass       |
+| load/peak_rss_mib          |     48.852 |     50.914 |  4.2% |  4.0 | pass       |
+| static/binary_bytes        | 80,729,920 | 84,924,952 |  5.2% | 5.0% | REGRESSION |
+| static/render_bundle_bytes |  2,001,714 |  2,001,714 |  0.0% |      | pass       |
 
 The rows left out are within 6% and their bands. The render harness's peak RSS rises
 by about 19 MB in all four pages, inside the band; the load server's by 2 MiB. The size
 comes from the library's plugins and CLI the port doesn't mount (above). The full kit
 baseline hasn't run.
+
+### Trim
+
+The linker already drops the plugins the port doesn't mount: two-factor, device codes,
+admin, and passkeys add under 1 KiB of code each (`cargo bloat` on `snowtime-axum`). The
+library's own size is what it serves: `better_auth_api` 713 KiB (OAuth 403 KiB, API keys
+96 KiB), `better_auth_core` 339 KiB, `jsonwebtoken` 239 KiB, and `josekit` 90 KiB, plus its
+generics compiled into `snowtime_server`. Two changes trimmed it:
+
+- The port's store refused the library's organization, member, and invitation calls
+  instead of serving them (`20b23e7`). It had full SQL for them, which nothing called:
+  the organization plugin isn't mounted, and API keys refuse organization keys without
+  it. The store is a trait object, so that code stayed in the binary; `snowtime_server`
+  drops 0.3 MiB.
+- The fork puts the two-factor, passkey, and device-authorization plugins and the
+  scripts' `clap` and `serde_yaml` behind default features (`b87bd932`, pull request 7 in
+  [upstream.md](better-auth-rs/upstream.md)). The port, with `default-features = false`,
+  leaves out 19 crates, among them `totp-rs`, `base32`, `clap`, and `serde_yaml`;
+  `THIRD_PARTY_LICENSES` loses 17 entries. The binary barely changes.
+
+The stripped `snowtime-axum` on macOS arm64 is 77,673,208 bytes, up 3,853,616 (5.2%) from
+the rollback tag's 73,819,592, and down about 400,000 from before the trim. The bar holds:
+conformance 66/570/13, `compare.ts` 1,490 byte-equal, hardening 17, server 128 both ways,
+host 36, render 18, Clippy and cargo-deny both ways, cargo-audit, and the licenses check.
+The fork's workspace tests pass (669) and so does its compatibility harness
+(`full_client_compat` and `configuration_client_compat`).
+
+The gate after `--build-current` at `20b23e7` (fork `b87bd932`), `mac` profile, against
+the baseline frozen at `5a5cb9b`, passes every metric; evidence in
+`app/perf/.cache/native-gate/runs/2026-10-10T11-51-47.279Z`:
+
+| Metric                     |   Baseline |    Current | Delta | Band | Gate |
+| -------------------------- | ---------: | ---------: | ----: | ---: | ---- |
+| render/timer/cpu_ms        |     14.723 |     15.507 |  5.3% | 1.47 | pass |
+| render/year/p95_ms         |     29.294 |     31.187 |  6.5% | 2.93 | pass |
+| render/\*/peak_rss_mb      |    209.762 |    230.559 |  9.9% | 20.8 | pass |
+| api/session/cpu_ms         |      0.120 |      0.120 |  0.0% | 0.02 | pass |
+| api/entries/cpu_ms         |      0.440 |      0.430 | -2.3% | 0.02 | pass |
+| load/cpu_ms                |      0.739 |      0.714 | -3.4% | 0.04 | pass |
+| load/peak_rss_mib          |     48.785 |     50.277 |  3.1% |  4.0 | pass |
+| static/binary_bytes        | 80,729,920 | 84,531,736 |  4.7% | 5.0% | pass |
+| static/render_bundle_bytes |  2,001,714 |  2,001,714 |  0.0% |      | pass |
+
+The rows left out are within 10% and their bands. The Linux binary is 393,216 bytes
+smaller than at `11220ac`, which brings it inside its band. Shrinking it further means
+dropping code the port runs: the library's OAuth and JWT handling.
 
 ### Rollback
 
@@ -215,14 +261,10 @@ this branch keeps. Forward-port any app features added since by rerunning the ba
 Kait chose (2026-10-10) to keep better-auth-rs, with organizations, invitations, and
 profile writes, passkeys, and password sign-in as app code beside it.
 
-1. Trim the fork: put the plugins and CLI the port doesn't mount behind features (two-factor,
-   device codes, the CLI's `clap` and `serde_yaml`, `totp-rs`, `aes-gcm`, and others the
-   graph shows), with the library's defaults unchanged. Rerun the bar, the compatibility
-   harness, `--build-current`, and the gate; record the binary size.
-2. With Kait's approval: file the upstream pull requests and the OAuth state issue
+1. With Kait's approval: file the upstream pull requests and the OAuth state issue
    ([upstream.md](better-auth-rs/upstream.md)), push the fork, and point the `[patch]`
    at its URL and commit so CI builds the branch.
-3. Write the kit's auth recipe: the library for sessions, OAuth, and API key creation;
+2. Write the kit's auth recipe: the library for sessions, OAuth, and API key creation;
    app code for organizations, passkeys, and password sign-in.
-4. If upstream hasn't engaged with the OAuth state issue after a few weeks, reconsider
+3. If upstream hasn't engaged with the OAuth state issue after a few weeks, reconsider
    promoting 081.28's port to a kit crate (Rollback above).

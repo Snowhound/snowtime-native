@@ -3,7 +3,7 @@
 Drafts only. Nothing here has been filed or pushed; each waits for Kait's approval. The
 fork is the local branch `snowtime` of `better-auth-rs`, on `master` at `9f91cd7`
 (2026-09-30). Upstream's compatibility harness pins better-auth `1.7.6`; the app runs
-`1.7.7`. Pull requests 1–6 below were drafted at sign-out; the fork also carries the OAuth fixes
+`1.7.7`. Pull requests 1–6 below were drafted at sign-out and 7 at the trim; the fork also carries the OAuth fixes
 listed at the end, not yet drafted. Commit IDs changed with a rebase on 2026-10-10; see
 `git log 9f91cd7..snowtime` in the fork.
 
@@ -59,6 +59,16 @@ The workspace pins `jsonwebtoken` with `rust_crypto`, which depends on `rsa` 0.9
 on RUSTSEC-2023-0071 (Marvin attack, no fixed release). cargo-deny and cargo-audit fail
 for any app that denies unfixed advisories. The patch moves the backend to features:
 `jwt-rust-crypto` (default, unchanged behavior) or `jwt-aws-lc-rs`.
+
+### 7. Optional plugins and script dependencies (`b87bd932`)
+
+Every app builds `totp-rs`, `webauthn-rs-core`, and `serde_cbor_2`, and the root crate's
+`clap` and `serde_yaml`, which only the maintainer scripts in `scripts/` use. The patch
+adds default features `two-factor`, `passkey`, and `device-authorization` to the API and
+root crates, and `scripts` to the root crate, which the script binaries require. With the
+defaults, nothing changes; an app with `default-features = false` drops 19 crates. Sign-in
+skips the two-factor check without `two-factor`. The linker already drops unmounted plugin
+code, so the binary barely changes; the gain is the dependency graph and build time.
 
 ## Issue: OAuth state follows the pre-1.7 protocol
 
