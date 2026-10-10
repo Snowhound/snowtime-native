@@ -325,13 +325,15 @@ export async function compareApiKeys(
         { mask: ['id', 'key'] },
       )
     }
-    // The created keys, read back from each copy to compare their rows.
+    // The created keys, read back from each copy to compare their rows. Durations are in
+    // whole seconds: Better Auth reads the clock once per column, so its times can differ
+    // by a millisecond where the native host's, read once, don't.
     async function rowsOf(side: Side) {
       const db = createClient({ url: `file:${copies[side]}` })
       try {
         return (
           await db.execute(
-            "select *, expires_at - created_at as lifetime, updated_at - created_at as updated from api_key where name like 'New %' order by name",
+            "select *, (expires_at - created_at) / 1000 as lifetime, (updated_at - created_at) / 1000 as updated from api_key where name like 'New %' order by name",
           )
         ).rows.map((row) => ({ ...row }))
       } finally {
