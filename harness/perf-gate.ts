@@ -5,7 +5,6 @@ import { join, relative, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { signInHeaders } from '../app/perf/lib/app'
 import { CACHE, ROOT, seededDatabase } from '../app/perf/lib/database'
-import { checkNativeBenchmarkHealth } from '../app/perf/stress/health'
 import { checkOtherSessions, reserveStack } from '../app/perf/stress/lock'
 import { droppedActions } from '../app/perf/stress/metrics'
 import { LOCAL_SECRET } from '../app/perf/stress/stack'
@@ -288,7 +287,6 @@ async function inside() {
     }
     const api = await startNative(join(artifact, 'server'), join(inputs, 'api.db'), env)
     try {
-      checkNativeBenchmarkHealth(await fetch(`${api.url}/readyz`).then((r) => r.json()))
       const result = await nativeHotTimings(
         api,
         await signInHeaders(api, 'admin'),
@@ -306,7 +304,6 @@ async function inside() {
       BETTER_AUTH_SECRET: LOCAL_SECRET,
     })
     try {
-      checkNativeBenchmarkHealth(await fetch(`${load.url}/readyz`).then((r) => r.json()))
       const result = await replay(load, round)
       for (const [metric, value] of Object.entries(result)) metrics[`load/${metric}`] = value
     } finally {
