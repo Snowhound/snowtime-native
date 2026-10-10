@@ -3,7 +3,7 @@
 Run from the repository root, with `deploy/load/app.patch` applied to `app/`
 ([deploy/load/README.md](../../deploy/load/README.md)). Build images and generate both
 datasets before measuring.
-Task [081.10](../../docs/tasks/081-native-backend/10-load-and-scaling.md) records results.
+Task [081.10](../../docs/tasks/10-load-and-scaling.md) records results.
 The shared stress guard serializes local runs across worktrees. Leave the Mac idle.
 
 ```sh
