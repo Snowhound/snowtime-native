@@ -11,7 +11,7 @@ records the API's measurements and subtask 01 the renderer's.
 The repository holds only what the port adds, in the porting kit's default layout:
 
 ```text
-app/           snowtime as a git submodule at the pinned commit; never edited here
+app/           snowtime as a git submodule at the pinned commit
 crates/        server (rules and Axum router), render (V8), host (the snowtime-axum binary)
 adapter/       the render bundle's build, run on app/'s toolchain, and its benchmarks
 harness/       the byte comparisons, the conformance runner, and the native server starter
@@ -20,8 +20,12 @@ deploy/        the release image, the V8 archive script, and the load harness pa
 docs/          the port's architecture and the 081 records
 ```
 
-Pinned at snowtime `main`'s head, `54ae90f`; the pin follows `main`. Against it the
-native host passes all 66 conformance tests (570 assertions, 13 files), all 1,490
+Pinned at snowtime `54ae90f`, `main`'s head on 2026-10-10. The pin records which of the
+app's features the port implements and which client bundle it serves. A `main` commit
+that doesn't change the port's output in a meaningful way, such as tests, tooling, or
+docs, can move the pin with no porting once the bar passes. The pin doesn't have to
+follow every commit: the port catches up on features at its own pace. Against the pin
+the native host passes all 66 conformance tests (570 assertions, 13 files), all 1,490
 `compare.ts` calls byte for byte, and the 17 `hardening-compare.ts` checks.
 `node_modules` links to `app/node_modules`, so the harness and the adapter run on the
 app's packages.
