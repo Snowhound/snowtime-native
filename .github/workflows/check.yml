@@ -23,8 +23,11 @@ jobs:
     timeout-minutes: 90
     env:
       CARGO_TERM_COLOR: always
-      RUSTY_V8_ARCHIVE: ${{ runner.temp }}/librusty_v8.a.gz
     steps:
+      # Job-level env can't read the runner context, so the V8 path is set here.
+      - name: V8 library path
+        run: echo "RUSTY_V8_ARCHIVE=$RUNNER_TEMP/librusty_v8.a.gz" >> "$GITHUB_ENV"
+
       # app/ is the snowtime submodule at the pinned commit.
       - uses: actions/checkout@v7
         with:
