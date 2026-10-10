@@ -203,39 +203,6 @@ pub(crate) fn name_check(name: &str) -> AuthResult<()> {
     }
     Ok(())
 }
-pub(crate) fn slug_check(slug: &str) -> AuthResult<()> {
-    if slug.is_empty()
-        || slug.split('-').any(str::is_empty)
-        || !slug
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-    {
-        return Err(AuthError::bad_request("SLUG_FORMAT"));
-    }
-    if slug.len() > 48 {
-        return Err(AuthError::bad_request("SLUG_TOO_LONG"));
-    }
-    if [
-        "timer",
-        "reports",
-        "projects",
-        "organization",
-        "settings",
-        "api",
-        "sign-in",
-        "create-organization",
-        "invitation",
-        "privacy",
-        "terms",
-        "backgrounds",
-        "brand",
-    ]
-    .contains(&slug)
-    {
-        return Err(AuthError::bad_request("SLUG_RESERVED"));
-    }
-    Ok(())
-}
 fn domain_refusal() -> AuthError {
     AuthError::Upstream {
         status: 403,
@@ -713,268 +680,112 @@ impl VerificationStore<Schema> for LaneStore {
     }
 }
 
+// Organizations, members, and invitations stay app code (auth/writes.rs); the library's
+// plugin isn't mounted.
 #[async_trait]
 impl OrganizationStore for LaneStore {
-    async fn create_organization(&self, org: CreateOrganization) -> AuthResult<Organization> {
-        name_check(&org.name)?;
-        slug_check(&org.slug)?;
-        self.run(move |db| { let id=org.id.unwrap_or_else(id); execute(db,"insert into organization (id,name,slug,logo,metadata,created_at) values (?1,?2,?3,?4,?5,?6)",vec![json!(id),json!(org.name),json!(org.slug),json!(org.logo),json!(org.metadata.map(|v|v.to_string())),json!(now())])?; one(db,"select * from organization where id=?1",vec![json!(id)]) }).await
+    async fn create_organization(&self, _org: CreateOrganization) -> AuthResult<Organization> {
+        Err(error("organizations are app code"))
     }
-    async fn get_organization_by_id(&self, id: &str) -> AuthResult<Option<Organization>> {
-        let id = id.to_owned();
-        self.read(move |db| {
-            Ok(query(
-                db,
-                "select * from organization where id=?1",
-                vec![json!(id)],
-            )?
-            .into_iter()
-            .next())
-        })
-        .await
+    async fn get_organization_by_id(&self, _id: &str) -> AuthResult<Option<Organization>> {
+        Err(error("organizations are app code"))
     }
-    async fn get_organization_by_slug(&self, slug: &str) -> AuthResult<Option<Organization>> {
-        let slug = slug.to_owned();
-        self.read(move |db| {
-            Ok(query(
-                db,
-                "select * from organization where slug=?1",
-                vec![json!(slug)],
-            )?
-            .into_iter()
-            .next())
-        })
-        .await
+    async fn get_organization_by_slug(&self, _slug: &str) -> AuthResult<Option<Organization>> {
+        Err(error("organizations are app code"))
     }
-    async fn list_organizations_by_ids(&self, ids: &[String]) -> AuthResult<Vec<Organization>> {
-        let ids = ids.to_vec();
-        self.read(move |db| {
-            let mut rows = Vec::<Organization>::new();
-            for id in ids {
-                rows.extend(query(
-                    db,
-                    "select * from organization where id=?1",
-                    vec![json!(id)],
-                )?);
-            }
-            Ok(rows)
-        })
-        .await
+    async fn list_organizations_by_ids(&self, _ids: &[String]) -> AuthResult<Vec<Organization>> {
+        Err(error("organizations are app code"))
     }
     async fn update_organization(
         &self,
-        id: &str,
-        update: UpdateOrganization,
+        _id: &str,
+        _update: UpdateOrganization,
     ) -> AuthResult<Organization> {
-        let id = id.to_owned();
-        if let Some(name) = &update.name {
-            name_check(name)?;
-        }
-        if update.slug.is_some() {
-            return Err(AuthError::bad_request("SLUG_READ_ONLY"));
-        }
-        self.run(move |db| { execute(db,"update organization set name=coalesce(?1,name),slug=coalesce(?2,slug),logo=coalesce(?3,logo),metadata=coalesce(?4,metadata) where id=?5",vec![json!(update.name),json!(update.slug),json!(update.logo),json!(update.metadata.map(|v|v.to_string())),json!(id)])?; one(db,"select * from organization where id=?1",vec![json!(id)]) }).await
+        Err(error("organizations are app code"))
     }
     async fn delete_organization(&self, _id: &str) -> AuthResult<()> {
-        Err(AuthError::bad_request("organization deletion disabled"))
+        Err(error("organizations are app code"))
     }
-    async fn list_user_organizations(&self, user_id: &str) -> AuthResult<Vec<Organization>> {
-        let user_id = user_id.to_owned();
-        self.read(move |db| query(db, "select * from organization where id in (select organization_id from member where user_id=?1)", vec![json!(user_id)])).await
+    async fn list_user_organizations(&self, _user_id: &str) -> AuthResult<Vec<Organization>> {
+        Err(error("organizations are app code"))
     }
 }
 
 #[async_trait]
 impl MemberStore for LaneStore {
-    async fn create_member(&self, member: CreateMember) -> AuthResult<Member> {
-        self.run(move |db| { let id=id(); execute(db,"insert into member (id,organization_id,user_id,role,created_at) values (?1,?2,?3,?4,?5)",vec![json!(id),json!(member.organization_id),json!(member.user_id),json!(member.role),json!(now())])?; one(db,"select * from member where id=?1",vec![json!(id)]) }).await
+    async fn create_member(&self, _member: CreateMember) -> AuthResult<Member> {
+        Err(error("organizations are app code"))
     }
-    async fn get_member(&self, organization_id: &str, user_id: &str) -> AuthResult<Option<Member>> {
-        let organization_id = organization_id.to_owned();
-        let user_id = user_id.to_owned();
-        self.read(move |db| {
-            Ok(query(
-                db,
-                "select * from member where organization_id=?1 and user_id=?2",
-                vec![json!(organization_id), json!(user_id)],
-            )?
-            .into_iter()
-            .next())
-        })
-        .await
+    async fn get_member(
+        &self,
+        _organization_id: &str,
+        _user_id: &str,
+    ) -> AuthResult<Option<Member>> {
+        Err(error("organizations are app code"))
     }
-    async fn get_member_by_id(&self, id: &str) -> AuthResult<Option<Member>> {
-        let id = id.to_owned();
-        self.read(move |db| {
-            Ok(
-                query(db, "select * from member where id=?1", vec![json!(id)])?
-                    .into_iter()
-                    .next(),
-            )
-        })
-        .await
+    async fn get_member_by_id(&self, _id: &str) -> AuthResult<Option<Member>> {
+        Err(error("organizations are app code"))
     }
-    async fn update_member_role(&self, member_id: &str, role: &str) -> AuthResult<Member> {
-        let member_id = member_id.to_owned();
-        let role = role.to_owned();
-        self.run(move |db| {
-            execute(
-                db,
-                "update member set role=?1 where id=?2",
-                vec![json!(role), json!(member_id)],
-            )?;
-            one(
-                db,
-                "select * from member where id=?1",
-                vec![json!(member_id)],
-            )
-        })
-        .await
+    async fn update_member_role(&self, _member_id: &str, _role: &str) -> AuthResult<Member> {
+        Err(error("organizations are app code"))
     }
-    async fn delete_member(&self, member_id: &str) -> AuthResult<()> {
-        let member_id = member_id.to_owned();
-        self.run(move |db| {
-            execute(db, "delete from member where id=?1", vec![json!(member_id)])?;
-            Ok(())
-        })
-        .await
+    async fn delete_member(&self, _member_id: &str) -> AuthResult<()> {
+        Err(error("organizations are app code"))
     }
-    async fn list_organization_members(&self, org_id: &str) -> AuthResult<Vec<Member>> {
-        let org_id = org_id.to_owned();
-        self.read(move |db| {
-            query(
-                db,
-                "select * from member where organization_id=?1",
-                vec![json!(org_id)],
-            )
-        })
-        .await
+    async fn list_organization_members(&self, _org_id: &str) -> AuthResult<Vec<Member>> {
+        Err(error("organizations are app code"))
     }
     async fn query_organization_members(
         &self,
-        params: &ListOrganizationMembersParams,
+        _params: &ListOrganizationMembersParams,
     ) -> AuthResult<(Vec<Member>, usize)> {
-        let _ = (params,);
-        Err(error("query_organization_members is outside this spike"))
+        Err(error("organizations are app code"))
     }
-    async fn count_organization_members(&self, org_id: &str) -> AuthResult<i64> {
-        let org_id = org_id.to_owned();
-        self.read(move |db| {
-            db.query_row(
-                "select count(*) from member where organization_id=?1",
-                params_from_iter(
-                    vec![json!(org_id)]
-                        .into_iter()
-                        .map(sql_value)
-                        .collect::<AuthResult<Vec<_>>>()?,
-                ),
-                |r| r.get(0),
-            )
-            .map_err(error)
-        })
-        .await
+    async fn count_organization_members(&self, _org_id: &str) -> AuthResult<i64> {
+        Err(error("organizations are app code"))
     }
-    async fn count_organization_owners(&self, org_id: &str) -> AuthResult<i64> {
-        let org_id = org_id.to_owned();
-        self.read(move |db| {
-            db.query_row(
-                "select count(*) from member where organization_id=?1 and role='owner'",
-                params_from_iter(
-                    vec![json!(org_id)]
-                        .into_iter()
-                        .map(sql_value)
-                        .collect::<AuthResult<Vec<_>>>()?,
-                ),
-                |r| r.get(0),
-            )
-            .map_err(error)
-        })
-        .await
+    async fn count_organization_owners(&self, _org_id: &str) -> AuthResult<i64> {
+        Err(error("organizations are app code"))
     }
 }
 
 #[async_trait]
 impl InvitationStore for LaneStore {
-    async fn create_invitation(&self, invitation: CreateInvitation) -> AuthResult<Invitation> {
-        self.run(move |db| { let id=id(); execute(db,"insert into invitation (id,organization_id,email,role,inviter_id,expires_at,created_at,status) values (?1,?2,?3,?4,?5,?6,?7,'pending')",vec![json!(id),json!(invitation.organization_id),json!(invitation.email.to_lowercase()),json!(invitation.role),json!(invitation.inviter_id),json!(invitation.expires_at.timestamp_millis()),json!(now())])?; one(db,"select * from invitation where id=?1",vec![json!(id)]) }).await
+    async fn create_invitation(&self, _invitation: CreateInvitation) -> AuthResult<Invitation> {
+        Err(error("organizations are app code"))
     }
-    async fn get_invitation_by_id(&self, id: &str) -> AuthResult<Option<Invitation>> {
-        let id = id.to_owned();
-        self.read(move |db| {
-            Ok(
-                query(db, "select * from invitation where id=?1", vec![json!(id)])?
-                    .into_iter()
-                    .next(),
-            )
-        })
-        .await
+    async fn get_invitation_by_id(&self, _id: &str) -> AuthResult<Option<Invitation>> {
+        Err(error("organizations are app code"))
     }
     async fn get_pending_invitation(
         &self,
-        org_id: &str,
-        email: &str,
+        _org_id: &str,
+        _email: &str,
     ) -> AuthResult<Option<Invitation>> {
-        let org_id = org_id.to_owned();
-        let email = email.to_lowercase();
-        self.read(move |db| Ok(query(db, "select * from invitation where organization_id=?1 and email=?2 and status='pending' and expires_at>?3", vec![json!(org_id),json!(email),json!(now())])?.into_iter().next())).await
+        Err(error("organizations are app code"))
     }
     async fn update_invitation_status(
         &self,
-        id: &str,
-        status: InvitationStatus,
+        _id: &str,
+        _status: InvitationStatus,
     ) -> AuthResult<Invitation> {
-        let id = id.to_owned();
-        self.run(move |db| {
-            execute(
-                db,
-                "update invitation set status=?1 where id=?2",
-                vec![json!(status.to_string()), json!(id)],
-            )?;
-            one(db, "select * from invitation where id=?1", vec![json!(id)])
-        })
-        .await
+        Err(error("organizations are app code"))
     }
     async fn update_invitation_expiry(
         &self,
-        id: &str,
-        expires_at: DateTime<Utc>,
+        _id: &str,
+        _expires_at: DateTime<Utc>,
     ) -> AuthResult<Invitation> {
-        let id = id.to_owned();
-        self.run(move |db| {
-            execute(
-                db,
-                "update invitation set expires_at=?1 where id=?2",
-                vec![json!(expires_at.timestamp_millis()), json!(id)],
-            )?;
-            one(db, "select * from invitation where id=?1", vec![json!(id)])
-        })
-        .await
+        Err(error("organizations are app code"))
     }
-    async fn list_organization_invitations(&self, org_id: &str) -> AuthResult<Vec<Invitation>> {
-        let org_id = org_id.to_owned();
-        self.read(move |db| {
-            query(
-                db,
-                "select * from invitation where organization_id=?1",
-                vec![json!(org_id)],
-            )
-        })
-        .await
+    async fn list_organization_invitations(&self, _org_id: &str) -> AuthResult<Vec<Invitation>> {
+        Err(error("organizations are app code"))
     }
-    async fn count_pending_organization_invitations(&self, org_id: &str) -> AuthResult<i64> {
-        let org_id = org_id.to_owned();
-        self.read(move |db| db.query_row("select count(*) from invitation where organization_id=?1 and status='pending' and expires_at>?2",params_from_iter(vec![json!(org_id),json!(now())].into_iter().map(sql_value).collect::<AuthResult<Vec<_>>>()?),|r|r.get(0)).map_err(error)).await
+    async fn count_pending_organization_invitations(&self, _org_id: &str) -> AuthResult<i64> {
+        Err(error("organizations are app code"))
     }
-    async fn list_user_invitations(&self, email: &str) -> AuthResult<Vec<Invitation>> {
-        let email = email.to_lowercase();
-        self.read(move |db| {
-            query(
-                db,
-                "select * from invitation where email=?1",
-                vec![json!(email)],
-            )
-        })
-        .await
+    async fn list_user_invitations(&self, _email: &str) -> AuthResult<Vec<Invitation>> {
+        Err(error("organizations are app code"))
     }
 }
 
