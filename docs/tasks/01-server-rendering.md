@@ -14,7 +14,7 @@ rendering cheap and hydration compatible. Task 079 is cancelled.
 ### The native host serves pages, 2026-10-04
 
 `snowtime-axum` now renders pages through the render crate
-([`native/README.md`](../../native/README.md), "Server rendering"). It serves `/api/` from
+([`native/README.md`](../../README.md), "Server rendering"). It serves `/api/` from
 the API router, public files from `EDGE_STATIC_DIR`, and every other path as a page. The
 renderer's API calls go through `router.oneshot` with the page's cookie. A renderer writes
 the whole page into a buffer and takes the next one; the handler sends the buffer, so a
@@ -197,7 +197,7 @@ renderer.
 ### Render crate and Linux measurements, 2026-10-04
 
 The rerunnable harness is now in
-[`native/crates/render`](../../native/crates/render/README.md). The crate loads the app's
+[`native/crates/render`](../../crates/render/README.md). The crate loads the app's
 2.38 MB server bundle from a V8 snapshot (`deno_core` 0.405.0, V8 14.9.207.2-rusty).
 This section measured its first version, which returned HTML chunks through bounded
 channels and offered an Actix worker; the host integration above replaced both.
@@ -487,7 +487,7 @@ gaps, with production-mode refusal checks and a shared write-limit switch.
 Status: procedure prepared on 2026-10-08; Ryzen results pending Kait's run. This full
 baseline records the starting capacity and app RSS for the kit phase. It does not
 close the Hetzner criterion, which waits until the port and kit refactor are complete.
-The quick per-step gate is documented in [native/README.md](../../native/README.md#performance-gate-for-the-kit-refactor).
+The quick per-step gate is documented in [native/README.md](../../README.md#performance-gate).
 
 Run on Kait's Ryzen under WSL with Docker. The script records the exact CPU, kernel,
 Docker resources/version, commit and working-tree diff, image IDs, SHA-256 input
@@ -495,7 +495,7 @@ hashes, UTC command boundaries, and arguments. Record the resulting identifiers,
 held offer, two lifetime/hold RSS peaks, and raw evidence here after Kait returns
 output. No numbers are claimed before that run. Step 0 remains commit `332b476`.
 
-[`kit-baseline.ts`](../../native/bench/scaling/kit-baseline.ts) runs one M capacity
+[`kit-baseline.ts`](../../harness/scaling/kit-baseline.ts) runs one M capacity
 ramp with 30-second steps and a 120-second passing hold, then two fresh 120-second
 runs at that held offer. Each invocation restores the source and drops caches before
 starting a fresh app. The native app uses one renderer, zero readers, `multi_thread`,

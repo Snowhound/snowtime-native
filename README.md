@@ -3,7 +3,7 @@
 Snowtime's backend in Rust: the JSON API on the same SQLite schema as the TypeScript
 backend, with its own authentication, and the pages rendered by the app's own server
 bundle in V8. It began as the proof of concept of snowtime task 081; its records are in
-[`docs/tasks/081-native-backend/`](docs/tasks/081-native-backend/README.md). Subtask 03
+[`docs/tasks/`](docs/tasks/README.md). Subtask 03
 records the API's measurements and subtask 01 the renderer's.
 
 ## Layout and pin
@@ -35,12 +35,12 @@ app's packages.
 ([deploy/load/README.md](deploy/load/README.md)).
 
 The audit records are linked from here:
-[Task 081.30](docs/tasks/081-native-backend/30-audit.md#parity-record) records the audit's
-findings. [Task 081.31](docs/tasks/081-native-backend/31-input-bounds.md) records the
+[Task 081.30](docs/tasks/30-audit.md#parity-record) records the audit's
+findings. [Task 081.31](docs/tasks/31-input-bounds.md) records the
 current checks and deliberate auth input bounds that differ from TypeScript.
-[Task 081.32](docs/tasks/081-native-backend/32-domains.md) records the login-domain
+[Task 081.32](docs/tasks/32-domains.md) records the login-domain
 middleware and Better Auth's error page, and their differences from TypeScript.
-[Task 081.38](docs/tasks/081-native-backend/38-api-keys.md) records personal API keys and
+[Task 081.38](docs/tasks/38-api-keys.md) records personal API keys and
 their differences from TypeScript. The records keep the paths of the snowtime branch they
 were written on: `native/crates/` is now `crates/`, `native/bench/` is `harness/`, and
 `native/crates/render/bundle/` is `adapter/`.
@@ -88,7 +88,7 @@ Of the other writes, the timer's, the entries', settings PUT/PATCH, and project 
 Invitation preview/list/create and issue-link writes are also ported, with all 880
 functional comparison calls byte-equal in task 081.26.
 Invitation acceptance through the application API and Better Auth is ported in
-[task 081.28](docs/tasks/081-native-backend/28-auth-port.md), including team assignment
+[task 081.28](docs/tasks/28-auth-port.md), including team assignment
 and acceptance by an existing member without changing their role.
 Passkey registration, sign-in, listing, and removal are also ported in task 081.28.
 The native verifier uses the spike's pinned WebAuthn core and the existing COSE columns;
@@ -103,9 +103,9 @@ and leave bodies preserve Better Auth's validation refusals.
 Better Auth's direct ID-token sign-in is outside the app-used redirect flows and remains
 unported, as do its other endpoints that the client does not call.
 
-[Task 081.26](docs/tasks/081-native-backend/26-functional-port.md#local-review) gives
+[Task 081.26](docs/tasks/26-functional-port.md#local-review) gives
 localhost commands for separate seeded TypeScript and native hosts.
-[Task 081.28](docs/tasks/081-native-backend/28-auth-port.md#local-review) gives acceptance
+[Task 081.28](docs/tasks/28-auth-port.md#local-review) gives acceptance
 review commands and links for a new member and an existing member.
 
 Pages call the API in process: the renderer's host callback sends each call through
@@ -141,7 +141,7 @@ after the session SELECT has finished, even when the calling rule uses a reader.
 Maintenance rechecks the session under the writer lock before changing it. A
 request already using the writer reuses that lock.
 Readers cannot mutate the database. The pool remains opt-in: measured benefits depend on the
-workload and core allocation. [Subtask 10](docs/tasks/081-native-backend/10-load-and-scaling.md)
+workload and core allocation. [Subtask 10](docs/tasks/10-load-and-scaling.md)
 records the paired results, memory costs, and reasons for retaining the default.
 
 DB calls acquire async admission, then run on a database owner thread: one writer
@@ -536,7 +536,7 @@ Use a Linux filesystem checkout with Bun 1.4.2, Docker/Compose, and Chrome for t
 initial fixture capture. The full baseline's preparation builds both native images
 and preserves the M source/users pair and recording. The full baseline itself is
 one capacity ramp and two RSS holds, documented in
-[081.01](docs/tasks/081-native-backend/01-server-rendering.md#baseline-before-the-kit-refactor).
+[081.01](docs/tasks/01-server-rendering.md#baseline-before-the-kit-refactor).
 That longer baseline runs once at the start of the kit phase, separately from the gate.
 
 Transfer this repository and the pinned app commit without pushing if needed: the pin

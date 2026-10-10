@@ -5,10 +5,10 @@ import json
 import sys
 from pathlib import Path
 from statistics import mean
-root = Path(__file__).resolve().parents[4]
+root = Path(__file__).resolve().parents[1]
 results = root/'crates/render/results/props'
 variants = ('plain', 'shared')
-out = root/'tasks/081-native-backend/server-rendering'/(sys.argv[1] if len(sys.argv) > 1 else 'shared-props-mac.jsonl')
+out = root/'docs/tasks/server-rendering'/(sys.argv[1] if len(sys.argv) > 1 else 'shared-props-mac.jsonl')
 rows = []
 groups = {}
 for page in ('timer', 'week', 'month', 'year'):

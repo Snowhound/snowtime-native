@@ -95,7 +95,7 @@ production calls to reject invitations, leave/delete organizations, or update pa
 
 Verified on macOS arm64 on 2026-10-08. At completion of step 1, steps 2–4 were pending.
 Kait approved fixing the TypeScript already-member crash with the recorded option 2
-in [the auth decision](../../docs/architecture/auth.md#invitation-acceptance-after-joining).
+in [the auth decision](../../app/docs/architecture/auth.md#invitation-acceptance-after-joining).
 The scope commit is `2583c0c`; the isolated TypeScript fix is `1222cf2`, and the native
 implementation is `1397ee5`. Kait reviewed and approved applying the TypeScript fix to
 `main`, where it is committed as `c0e7d43`. The transplant preserves `main`'s existing

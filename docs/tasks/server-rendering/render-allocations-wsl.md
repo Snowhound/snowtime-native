@@ -345,7 +345,7 @@ Run `bun run test --config ./native/crates/render/results/allocation/test-config
 - [Initial own-key rounds](render-allocations-wsl-keys.jsonl)
 - [Compatible own-key rounds](render-allocations-wsl-keys-safe.jsonl)
 
-[The render README](../../../native/crates/render/README.md) describes the committed
+[The render README](../../../crates/render/README.md) describes the committed
 comparison, allocation, perf, and heap-policy scripts. Rebuild the original bundle at
 `f0cd1bf`, verify its recorded hash, and save its image and bundle/map before building
 the selected adapter. Recorded data can be compared across machines, but new captures

@@ -3,16 +3,16 @@
 Planned for the native backend (task 081); the TypeScript deployment remains on Start.
 Kait chose embedded rendering on 2026-10-02. The render crate implements it, and the
 native host (`snowtime-axum`) serves the timer and report pages through it.
-[Task 081.01](../tasks/081-native-backend/01-server-rendering.md) records measurements
+[Task 081.01](../tasks/01-server-rendering.md) records measurements
 and remaining work.
 
 Two engines sit behind one interface (`Pool`, `PageRequest`, `Page`), and `RENDER_ENGINE`
 picks one at start. Kait decided on 2026-10-07 that V8 embedded in the host is the engine,
 and parked the Bun sidecar
-([task 081.16](../tasks/081-native-backend/16-javascriptcore.md)). Tasks 081.19–081.22
+([task 081.16](../tasks/16-javascriptcore.md)). Tasks 081.19–081.22
 brought V8 to 1.21–1.30 times Bun's render CPU on the four measured pages, from 1.50–1.63
 when the sidecar was chosen on 2026-10-06, at the same or lower peak RSS and about 61 MB
-loaded per renderer ([report](../tasks/081-native-backend/server-rendering/hot-spots-mac.md#task-08122s-follow-ups)).
+loaded per renderer ([report](../tasks/server-rendering/hot-spots-mac.md#task-08122s-follow-ups)).
 V8 keeps the host one binary, with renderers as threads, one RSS to budget, and no child
 processes to start, confine, and restart. The sidecar would save 17–23% of render CPU,
 and it stays the alternative behind the same interface. Two conditions can reopen it:
@@ -69,7 +69,7 @@ V8's render CPU on every page, with lower p95, peak RSS, and post-render promoti
 costs Bun 10–21%. Task 081.19's prototype getters, the earlier candidate, were slower than
 plain on V8's timer and on every Bun page, and are removed. The choice is made per engine at build time
 (V8's snapshot) or at startup (Bun), and changes no browser assets or pool policy.
-[The report](../tasks/081-native-backend/server-rendering/shared-props-mac.md) records
+[The report](../tasks/server-rendering/shared-props-mac.md) records
 the measurements.
 
 ## Bun sidecar (parked)

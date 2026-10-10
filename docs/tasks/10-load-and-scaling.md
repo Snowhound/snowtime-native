@@ -1634,7 +1634,7 @@ instructions, using the same dataset files and recording from this worktree.
 
 Set the app's cpuset and memory limit to 1/2, 2/4, 4/8, and 8/16 cores/GiB. Include
 Litestream's and Caddy's memory in the host budget. Native traffic goes directly to
-its TLS listener; TypeScript traffic goes through Caddy. Use [`native/bench/scaling/README.md`](../../native/bench/scaling/README.md) and its
+its TLS listener; TypeScript traffic goes through Caddy. Use [`native/bench/scaling/README.md`](../../harness/scaling/README.md) and its
 ramp-first runner. Remote direct TLS now uses the configured native origin, with separate
 sampler access through `--sampler-url`. The remote deployment/TLS/tunnel protocol has
 not run here. Record generator CPU independently; the app-server sampler cannot see k6

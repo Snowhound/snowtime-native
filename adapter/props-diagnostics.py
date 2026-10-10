@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 from statistics import mean
-root = Path(__file__).resolve().parents[4]
+root = Path(__file__).resolve().parents[1]
 diag = root/'crates/render/results/props/diagnostic'
 rows = []
 groups = {}
@@ -29,7 +29,7 @@ for page in ('timer', 'week', 'month', 'year'):
                          'semi_space': semi, 'renders': 551,
                          'scavenges': text.count(' Scavenge '),
                          'mark_compacts': text.count(' Mark-Compact ')})
-out = root/'tasks/081-native-backend/server-rendering/shared-props-mac-diagnostics.jsonl'
+out = root/'docs/tasks/server-rendering/shared-props-mac-diagnostics.jsonl'
 out.write_text('\n'.join(json.dumps(r, separators=(',', ':')) for r in rows)+'\n')
 print('| Page | defineProperty getters | Fresh defineProperty getters | defineProperties getters | Getter literals evaluated | Literal getters created |')
 print('| --- | ---: | ---: | ---: | ---: | ---: |')

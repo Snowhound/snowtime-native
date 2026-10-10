@@ -4,7 +4,7 @@ The port's authentication is app code in `crates/server/src/auth/`. The app's
 `docs/architecture/auth.md` holds the rules it follows. This file records the choice of a
 Rust auth library.
 
-Question 5's [2026-10-06 spike](../tasks/081-native-backend/auth-spike.md) keeps
+Question 5's [2026-10-06 spike](../tasks/auth-spike.md) keeps
 better-auth-rs as the target, with an app-owned `rusqlite` store on the host's lanes.
 Its SeaORM adapter is rejected because its sqlx pool bypasses admission and the
 single writer. Async transaction callbacks need a separate writer-lifetime deadline;

@@ -291,7 +291,7 @@ The Linux verification copy is `/root/snowtime-functional-port` in Ubuntu WSL. I
 frontend and renderer bundles are built, and the host binary is
 `/root/snowtime/native/target/debug/snowtime-axum`. From PowerShell, enter Ubuntu with
 `wsl -d Ubuntu`. For another Linux or macOS checkout, build the frontend and renderer
-as [native/README.md](../../native/README.md#server-rendering) describes, then build the host.
+as [native/README.md](../../README.md#server-rendering) describes, then build the host.
 
 Create the two review databases while both apps are stopped. These commands use new
 review files; keep them separate from any database you already use:
