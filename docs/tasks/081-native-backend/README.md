@@ -311,6 +311,9 @@ which records the edge measurements.
   toolchain and base images, a native CI job, and a second-organization conformance file
 - [38](38-api-keys.md): personal API keys from `main`'s task 093: the `keys` routes, the key
   check, Settings' key calls, and the plugin's row, at `main` `1eedd18` (done)
+- [39](39-better-auth-rs.md): auth through better-auth-rs with the app's passkey module,
+  cookie check, and scrypt sign-in beside it, measured against the Mac gate's baseline
+  (todo)
 
 Task 084 moved the TypeScript app from server functions to the same API, through one
 client module. Task 089 replaces that module's call table with routes and client functions
