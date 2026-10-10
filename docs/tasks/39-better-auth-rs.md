@@ -201,6 +201,15 @@ by about 19 MB in all four pages, inside the band; the load server's by 2 MiB. T
 comes from the library's plugins and CLI the port doesn't mount (above). The full kit
 baseline hasn't run.
 
+### Rollback
+
+The tag `native-auth-081.28` marks `47b74fc`, the port before this task: every auth flow
+hand-ported in 081.28, no better-auth-rs dependency, and the full bar passing (conformance
+66/570/13, `compare.ts` 1,490 byte-equal, hardening 17). To return to it, branch from the
+tag, or revert this task's merge, and drop the `[patch]` and better-auth-rs entries from
+`Cargo.toml`. The organization, invitation, and profile writes there are the same code
+this branch keeps. Forward-port any app features added since by rerunning the bar.
+
 ### Next
 
 1. Kait decides: keep better-auth-rs, accepting the 5.2% binary size (or trim the
