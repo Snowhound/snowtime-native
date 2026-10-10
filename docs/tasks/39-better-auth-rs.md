@@ -1,6 +1,6 @@
 # 081.39: Auth through better-auth-rs, with passkeys beside it
 
-Status: in progress (2026-10-10): sign-out, OAuth, and API key creation on the library; the fork trimmed and the gate passing; upstream and push wait for Kait's approval
+Status: in progress (2026-10-10): sign-out, OAuth, and API key creation on the library; the fork trimmed, pushed, and offered upstream; the gate passing
 
 Move the port's auth onto better-auth-rs, the intended library ([question 5](README.md),
 Kait, 2026-10-06), on a branch, and measure what it costs. This applies the kit's auth
@@ -60,14 +60,14 @@ gate hasn't run.
 
 `Cargo.toml` names better-auth-rs `master` at `9f91cd7` (2026-09-30), whose
 compatibility harness pins better-auth `1.7.6`. A workspace `[patch]` points it at the
-local fork (`../better-auth-rs`, branch `snowtime`, 20 commits on `9f91cd7`), so
-`Cargo.lock` records path packages until Kait approves pushing the fork; then the patch
-names the fork's URL and commit. CI can't build the branch before that. At the fork's
-head (`796d9d91`) the library's compatibility harness passes: the dual-server client suite
-against better-auth 1.7.6 (`full_client_compat` and `configuration_client_compat`) and the
-workspace tests with Axum, SeaORM, and Redis (669). It runs without devenv once both
-compat directories have their packages installed. Pull requests and the OAuth
-issue are drafted in [better-auth-rs/upstream.md](better-auth-rs/upstream.md), none filed.
+fork, [`kaitk/better-auth-rs`](https://github.com/kaitk/better-auth-rs) branch
+`snowtime` (21 commits on `9f91cd7`), at commit `1508ab79`, and `deny.toml` allows that
+git source. At that commit the library's compatibility harness passes: the dual-server
+client suite against better-auth 1.7.6 (`full_client_compat` and
+`configuration_client_compat`) and the workspace tests with Axum, SeaORM, and Redis
+(673). It runs without devenv once both compat directories have their packages
+installed. Upstream has seven pull requests and the OAuth state issue
+([upstream.md](better-auth-rs/upstream.md)).
 
 The library adds no SeaORM or sqlx. Two fork features keep the host's crypto: reqwest
 without ring (`rustls-no-provider`), and JWTs on aws-lc-rs (`jwt-aws-lc-rs`), which also
@@ -174,12 +174,11 @@ server 128, host 36, Clippy both ways.
 
 ### Performance gate
 
-`perf-gate.ts --build-current` at `11220ac` (fork `796d9d91`), then the gate with the `mac`
+`perf-gate.ts --build-current` at `11220ac` (fork `d24263f3`), then the gate with the `mac`
 profile against the baseline frozen at `5a5cb9b`; evidence in
-`app/perf/.cache/native-gate/runs/2026-10-10T11-13-07.546Z`. The images can't reach the fork
-beside the repository, so the gate exports its committed tree and passes it as a named
-build context, which `deploy/Dockerfile` and `adapter/bench/Dockerfile` copy to
-`/better-auth-rs` (an empty stage otherwise).
+`app/perf/.cache/native-gate/runs/2026-10-10T11-13-07.546Z`. The fork was then local, so
+the gate passed it to the image builds as a named build context; since the `[patch]`
+names the pushed fork (`71ff987`), the builds fetch it like any git dependency.
 
 Every render, API, and load metric passes. The one flag is binary size, which doesn't vary
 between runs, so it wasn't repeated:
@@ -215,7 +214,7 @@ generics compiled into `snowtime_server`. Two changes trimmed it:
   it. The store is a trait object, so that code stayed in the binary; `snowtime_server`
   drops 0.3 MiB.
 - The fork puts the two-factor, passkey, and device-authorization plugins and the
-  scripts' `clap` and `serde_yaml` behind default features (`b87bd932`, pull request 7 in
+  scripts' `clap` and `serde_yaml` behind default features (`1508ab79`, pull request 7 in
   [upstream.md](better-auth-rs/upstream.md)). The port, with `default-features = false`,
   leaves out 19 crates, among them `totp-rs`, `base32`, `clap`, and `serde_yaml`;
   `THIRD_PARTY_LICENSES` loses 17 entries. The binary barely changes.
@@ -227,7 +226,7 @@ host 36, render 18, Clippy and cargo-deny both ways, cargo-audit, and the licens
 The fork's workspace tests pass (669) and so does its compatibility harness
 (`full_client_compat` and `configuration_client_compat`).
 
-The gate after `--build-current` at `20b23e7` (fork `b87bd932`), `mac` profile, against
+The gate after `--build-current` at `20b23e7` (fork `1508ab79`), `mac` profile, against
 the baseline frozen at `5a5cb9b`, passes every metric; evidence in
 `app/perf/.cache/native-gate/runs/2026-10-10T11-51-47.279Z`:
 
@@ -261,10 +260,7 @@ this branch keeps. Forward-port any app features added since by rerunning the ba
 Kait chose (2026-10-10) to keep better-auth-rs, with organizations, invitations, and
 profile writes, passkeys, and password sign-in as app code beside it.
 
-1. With Kait's approval: file the upstream pull requests and the OAuth state issue
-   ([upstream.md](better-auth-rs/upstream.md)), push the fork, and point the `[patch]`
-   at its URL and commit so CI builds the branch.
-2. Write the kit's auth recipe: the library for sessions, OAuth, and API key creation;
+1. Write the kit's auth recipe: the library for sessions, OAuth, and API key creation;
    app code for organizations, passkeys, and password sign-in.
-3. If upstream hasn't engaged with the OAuth state issue after a few weeks, reconsider
+2. If upstream hasn't engaged with the OAuth state issue after a few weeks, reconsider
    promoting 081.28's port to a kit crate (Rollback above).
