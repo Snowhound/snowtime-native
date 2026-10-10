@@ -6,20 +6,23 @@ mod policy;
 mod providers;
 mod store;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 mod transaction;
 
 use crate::http::App;
 use better_auth::{
     AuthConfig, BetterAuth,
-    plugins::{AccountManagementPlugin, OAuthPlugin, SessionManagementPlugin},
+    plugins::{
+        AccountManagementPlugin, ApiKeyPlugin, OAuthPlugin, SessionManagementPlugin,
+        api_key::{KeyExpirationConfig, RateLimitDefaults},
+    },
 };
 use better_auth_core::{
     middleware::{CsrfConfig, RateLimitConfig},
     schema::AuthSchema,
     wire::*,
 };
-pub(crate) use bridge::serve;
+pub(crate) use bridge::{call, serve};
 use std::{sync::Arc, time::Duration};
 pub use store::LaneStore;
 
@@ -64,9 +67,32 @@ pub(crate) async fn build(app: &Arc<App>) -> BetterAuth<Schema> {
         .plugin(SessionManagementPlugin::new())
         .plugin(oauth)
         .plugin(AccountManagementPlugin::new())
+        .plugin(api_keys())
         .build()
         .await
         .expect("better-auth-rs accepts the app's configuration")
+}
+
+// The app's apiKeyOptions (src/server/auth/api-keys.server.ts). The router sends none of the
+// plugin's HTTP endpoints here; the app creates keys through its server API and reads the
+// rows itself for everything else (auth/api_keys.rs).
+fn api_keys() -> ApiKeyPlugin {
+    ApiKeyPlugin::builder()
+        .prefix(crate::auth::api_keys::PREFIX.into())
+        .require_name(true)
+        .enable_session_for_api_keys(false)
+        .store_starting_characters(false)
+        .key_expiration(KeyExpirationConfig {
+            default_expires_in: None,
+            ..Default::default()
+        })
+        // The app counts a key's requests in its own rate-limit store; the row keeps the
+        // plugin's defaults of 10 a day.
+        .rate_limit(RateLimitDefaults {
+            enabled: false,
+            ..Default::default()
+        })
+        .build()
 }
 
 pub struct Schema;

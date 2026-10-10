@@ -31,7 +31,11 @@ async fn list_api_keys(call: AsUser<Empty>) -> Response {
     call.run(super::api_keys::list_api_keys).await
 }
 async fn create_api_key(call: AsUser<CreateApiKeyInput>) -> Response {
-    call.run(super::api_keys::create_api_key).await
+    call.then_library(
+        super::api_keys::check_api_key_room,
+        super::api_keys::issue_api_key,
+    )
+    .await
 }
 async fn revoke_api_key(call: AsUser<RevokeApiKeyInput>) -> Response {
     call.run(super::api_keys::revoke_api_key).await

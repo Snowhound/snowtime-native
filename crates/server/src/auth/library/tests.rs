@@ -4,8 +4,8 @@ use better_auth_core::{error::AuthError, store::*, types::*};
 use chrono::Utc;
 use std::time::{Duration, Instant};
 
-// The store holds a weak reference, so each test keeps its app.
-fn store(deadline: Duration) -> (Arc<App>, LaneStore) {
+/// A migrated in-memory app on the writer alone, whose lanes refuse after 30 ms.
+pub(crate) fn app() -> Arc<App> {
     let app = App::open_with_limits(
         Config {
             database_path: ":memory:".into(),
@@ -31,6 +31,12 @@ fn store(deadline: Duration) -> (Arc<App>, LaneStore) {
         &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../app/drizzle"),
     )
     .unwrap();
+    app
+}
+
+// The store holds a weak reference, so each test keeps its app.
+fn store(deadline: Duration) -> (Arc<App>, LaneStore) {
+    let app = app();
     let store = LaneStore::new(Arc::downgrade(&app), vec!["example.com".into()], deadline);
     (app, store)
 }

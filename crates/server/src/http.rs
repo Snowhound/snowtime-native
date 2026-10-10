@@ -683,6 +683,45 @@ impl<T: DeserializeOwned + Validate + Send + 'static, const READ: bool> AsUser<T
         )
         .await
     }
+    /// A rule whose checks run on the database's lane and whose result better-auth-rs then
+    /// finishes, taking the lanes again for its own statements.
+    pub async fn then_library<P: Send + 'static, O: Serialize>(
+        self,
+        rule: fn(&Connection, &str, T) -> Result<P>,
+        then: impl AsyncFnOnce(
+            &better_auth::BetterAuth<crate::auth::library::Schema>,
+            String,
+            P,
+        ) -> std::result::Result<O, Response>,
+    ) -> Response {
+        let app = self.0.clone();
+        let checked = Arc::new(Mutex::new(None));
+        let slot = checked.clone();
+        let response = answer(
+            self.0,
+            self.1,
+            READ,
+            false,
+            move |app, db, request, timer| {
+                let user = app.caller(db, request, READ, timer)?;
+                let prepared = rule(db, &user, decode(input(request)?)?)?;
+                *slot.lock().unwrap_or_else(|e| e.into_inner()) = Some((user, prepared));
+                Ok(ok(&()))
+            },
+        )
+        .await;
+        let Some((user, prepared)) = checked.lock().unwrap_or_else(|e| e.into_inner()).take()
+        else {
+            return response;
+        };
+        match then(app.better_auth().await, user, prepared).await {
+            Ok(output) => Response {
+                server_timing: response.server_timing,
+                ..ok(&output).into()
+            },
+            Err(refusal) => refusal,
+        }
+    }
 }
 impl<T: DeserializeOwned + Validate + Send + 'static, const READ: bool> Public<T, READ> {
     pub async fn run<O: Serialize + 'static>(

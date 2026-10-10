@@ -1,6 +1,6 @@
 # 081.39: Auth through better-auth-rs, with passkeys beside it
 
-Status: in progress (2026-10-10): sign-out and OAuth on the library; API keys and the measurements next
+Status: in progress (2026-10-10): sign-out, OAuth, and API key creation on the library; the measurements next
 
 Move the port's auth onto better-auth-rs, the intended library ([question 5](README.md),
 Kait, 2026-10-06), on a branch, and measure what it costs. This applies the kit's auth
@@ -132,17 +132,39 @@ and then decide between better-auth-rs and promoting 081.28's port to a kit crat
 attempt is saved in `temp/081.39/org-experiment.patch`; `temp/081.39/scripts/writes-debug.ts`
 prints every differing auth-writes step even when the flow throws.
 
+### API keys
+
+The app uses the plugin only to create a key, through its server API, because only the
+plugin generates one; listing, revoking, and the per-request key check read and change
+the rows directly (`api-keys.server.ts`). The port does the same: `POST /api/v1/api-keys`
+counts the user's keys on the writer's lane, then calls `auth.api_keys().create` with the
+app's `apiKeyOptions` (`library/mod.rs`), which takes the writer again for its insert and
+the expired-key cleanup. `verify_api_key` isn't used, as the app doesn't use
+`verifyApiKey`: it would add two writes to every keyed request. No route reaches the
+plugin's HTTP endpoints, as `apiKeyDisabledPaths` closes them in the app.
+
+`AsUser::then_library` (`http.rs`) runs a rule's checks on a lane and hands its result to
+the library; `library::call` answers a lane's refusal with the host's 503. The store
+binds the library's `f64` integers, writes a missing metadata as the text `'null'`, and
+deletes keys that expired strictly before now, each as better-auth's adapter and plugin do.
+One fork fix: the plugin reads the creation time before the expiry and passes it in
+`CreateApiKey`, as the TypeScript plugin's insert does, so a 30-day key's lifetime is never
+a millisecond short.
+
+The bar is unchanged: conformance 66/570/13, `compare.ts` 1,490 byte-equal (the API key
+rows column by column included), hardening 17, server tests 128 both ways, host 36,
+render 18, Clippy and cargo-deny both ways, cargo-audit. `api_keys.rs` drops from 273 to
+249 lines (key generation, the insert, and the expired-key cleanup); the library side
+adds about 100.
+
 ### Next
 
-1. API keys through the library's server-only operations (`ApiKeyPlugin::create_key`,
-   `update_key`, `verify_api_key`), with its HTTP key endpoints closed; check that
-   verification's per-call usage writes match the app's (`api-keys-compare.ts`).
-2. Before measuring: build the library at startup rather than on first request (a bad
+1. Before measuring: build the library at startup rather than on first request (a bad
    configuration now panics per request), run the compatibility harness
    (`compat-tests/reference-server` needs its packages installed), regenerate
    `THIRD_PARTY_LICENSES`, and update the line counts and binary size here.
-3. Apply `deploy/load/app.patch`, `bun harness/perf-gate.ts --build-current`, then
+2. Apply `deploy/load/app.patch`, `bun harness/perf-gate.ts --build-current`, then
    `caffeinate -i bun harness/perf-gate.ts`; record the table and flags here, repeat a
    flag in an idle session, and restore `app/`.
-4. Nothing is pushed, here or in the fork, until the perf and memory runs (Kait,
+3. Nothing is pushed, here or in the fork, until the perf and memory runs (Kait,
    2026-10-10).

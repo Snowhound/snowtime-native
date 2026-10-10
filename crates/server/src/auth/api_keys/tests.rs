@@ -92,40 +92,54 @@ fn reads_the_bearer_key_as_the_api_does() {
     }
 }
 
-#[test]
-fn generates_prefixed_keys_of_64_letters() {
-    let key = generate_key();
-    let letters = key.strip_prefix("snow_").unwrap();
-    assert_eq!(letters.len(), 64);
-    assert!(letters.bytes().all(|b| b.is_ascii_alphabetic()));
-    assert_ne!(generate_key(), key);
-}
-
-#[test]
-fn creates_the_row_the_plugin_creates() {
-    let db = database();
+// The row better-auth-rs writes, through the app's store and options, matches the one the
+// TypeScript plugin writes; creating a key also deletes expired ones.
+#[tokio::test]
+async fn creates_the_row_the_plugin_creates() {
+    let app = crate::auth::library::tests::app();
+    {
+        let db = app.db();
+        db.execute_batch("insert into user (id, name, email, email_verified, created_at, updated_at) values ('alice', 'Alice', 'alice@example.com', 1, 0, 0)").unwrap();
+        insert(&db, "past", "alice", "a", READ);
+        insert(&db, "later", "alice", "b", READ);
+        db.execute_batch("update api_key set expires_at = 1 where id = 'past'; update api_key set expires_at = 1e15 where id = 'later'").unwrap();
+    }
+    let auth = app.better_auth().await;
     let input = |lifetime: &str, access: &str| {
         decode::<CreateApiKeyInput>(
             json!({"name": "  Laptop  ", "lifetime": lifetime, "access": access}),
         )
         .unwrap()
     };
-    let created = create_api_key(&db, "alice", input("90d", "read")).unwrap();
-    assert!(created.key.starts_with("snow_"));
+    let created = issue_api_key(auth, "alice".into(), input("90d", "read"))
+        .await
+        .unwrap();
+    let letters = created.key.strip_prefix("snow_").unwrap();
+    assert_eq!(letters.len(), 64);
+    assert!(letters.bytes().all(|b| b.is_ascii_alphabetic()));
     // Every column but the generated id, hash, and times, as the plugin wrote it (row from
     // the TypeScript server).
-    let row: serde_json::Value = db
+    let mut row: serde_json::Value = app
+        .db()
         .query_row(
-            "select json_object('config_id', config_id, 'name', name, 'start', start, 'reference_id', reference_id, 'prefix', prefix, 'key', key, 'refill_interval', refill_interval, 'refill_amount', refill_amount, 'last_refill_at', last_refill_at, 'enabled', enabled, 'rate_limit_enabled', rate_limit_enabled, 'rate_limit_time_window', rate_limit_time_window, 'rate_limit_max', rate_limit_max, 'request_count', request_count, 'remaining', remaining, 'last_request', last_request, 'lifetime', expires_at - created_at, 'updated', updated_at - created_at, 'permissions', permissions, 'metadata', metadata, 'metadata_type', typeof(metadata)) from api_key where id = ?1",
+            "select json_object('config_id', config_id, 'name', name, 'start', start, 'reference_id', reference_id, 'prefix', prefix, 'key', key, 'refill_interval', refill_interval, 'refill_amount', refill_amount, 'last_refill_at', last_refill_at, 'enabled', enabled, 'rate_limit_enabled', rate_limit_enabled, 'rate_limit_time_window', rate_limit_time_window, 'time_window_type', typeof(rate_limit_time_window), 'rate_limit_max', rate_limit_max, 'request_count', request_count, 'remaining', remaining, 'last_request', last_request, 'lifetime', expires_at - created_at, 'updated', updated_at - created_at, 'permissions', permissions, 'metadata', metadata, 'metadata_type', typeof(metadata)) from api_key where id = ?1",
             [&created.id],
             |row| Ok(serde_json::from_str(&row.get::<_, String>(0)?).unwrap()),
         )
         .unwrap();
+    // The plugin reads the clock for the creation time, then again for the expiry, as the
+    // TypeScript plugin does, so a key may live a millisecond longer but never shorter.
+    let lifetime = row["lifetime"].as_i64().unwrap() - 90 * DAY_SECONDS * 1000;
+    assert!((0..=5).contains(&lifetime), "{lifetime}");
+    row["lifetime"] = json!(0);
     assert_eq!(
         row,
-        json!({"config_id": "default", "name": "Laptop", "start": null, "reference_id": "alice", "prefix": "snow_", "key": hash_key(&created.key), "refill_interval": null, "refill_amount": null, "last_refill_at": null, "enabled": 1, "rate_limit_enabled": 0, "rate_limit_time_window": 86_400_000, "rate_limit_max": 10, "request_count": 0, "remaining": null, "last_request": null, "lifetime": 90 * DAY_SECONDS * 1000, "updated": 0, "permissions": READ, "metadata": "null", "metadata_type": "text"})
+        json!({"config_id": "default", "name": "Laptop", "start": null, "reference_id": "alice", "prefix": "snow_", "key": hash_key(&created.key), "refill_interval": null, "refill_amount": null, "last_refill_at": null, "enabled": 1, "rate_limit_enabled": 0, "rate_limit_time_window": 86_400_000, "time_window_type": "integer", "rate_limit_max": 10, "request_count": 0, "remaining": null, "last_request": null, "lifetime": 0, "updated": 0, "permissions": READ, "metadata": "null", "metadata_type": "text"})
     );
-    let never = create_api_key(&db, "alice", input("none", "write")).unwrap();
+    let never = issue_api_key(auth, "alice".into(), input("none", "write"))
+        .await
+        .unwrap();
+    let db = app.db();
     let (expires, permissions): (Option<i64>, String) = db
         .query_row(
             "select expires_at, permissions from api_key where id = ?1",
@@ -134,6 +148,14 @@ fn creates_the_row_the_plugin_creates() {
         )
         .unwrap();
     assert_eq!((expires, permissions.as_str()), (None, WRITE));
+    let kept: Vec<String> = db
+        .prepare("select id from api_key where id in ('past', 'later')")
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .collect::<rusqlite::Result<_>>()
+        .unwrap();
+    assert_eq!(kept, ["later"]);
 }
 
 #[test]
@@ -170,42 +192,14 @@ fn caps_keys_per_user_counting_expired_ones() {
     db.execute("update api_key set expires_at = 1", []).unwrap();
     let input = decode(json!({"name": "One more", "lifetime": "30d", "access": "read"})).unwrap();
     assert!(matches!(
-        create_api_key(&db, "alice", input),
+        check_api_key_room(&db, "alice", input),
         Err(Error::App(crate::AppError {
             code: Code::LimitReached,
             key: Key::ApiKeyLimit
         }))
     ));
     let input = decode(json!({"name": "Bob's", "lifetime": "30d", "access": "read"})).unwrap();
-    assert!(create_api_key(&db, "bob", input).is_ok());
-}
-
-#[test]
-fn deletes_expired_keys_at_most_every_ten_seconds() {
-    let db = database();
-    insert(&db, "past", "alice", "a", READ);
-    insert(&db, "now", "alice", "b", READ);
-    insert(&db, "never", "alice", "c", READ);
-    db.execute_batch(&format!(
-        "update api_key set expires_at = {} where id = 'past'; update api_key set expires_at = {NOW} where id = 'now'",
-        NOW - 1
-    ))
-    .unwrap();
-    let ids = || {
-        db.prepare("select id from api_key order by id")
-            .unwrap()
-            .query_map([], |r| r.get::<_, String>(0))
-            .unwrap()
-            .collect::<rusqlite::Result<Vec<_>>>()
-            .unwrap()
-    };
-    let last_checked = Mutex::new(None);
-    delete_expired(&db, NOW, &last_checked);
-    assert_eq!(ids(), ["never", "now"]);
-    delete_expired(&db, NOW + 9_999, &last_checked);
-    assert_eq!(ids(), ["never", "now"]);
-    delete_expired(&db, NOW + 10_000, &last_checked);
-    assert_eq!(ids(), ["never"]);
+    assert!(check_api_key_room(&db, "bob", input).is_ok());
 }
 
 #[test]

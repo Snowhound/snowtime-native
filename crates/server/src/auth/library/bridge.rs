@@ -29,6 +29,30 @@ pub(super) fn refused(response: Response) -> AuthError {
     AuthError::internal(format!("database lane refused: {status}"))
 }
 
+/// Runs one of the library's server operations, answering a lane's refusal with the host's
+/// own and any other error as the library's HTTP API would.
+pub(crate) async fn call<T>(
+    operation: impl Future<Output = Result<T, AuthError>>,
+) -> Result<T, Response> {
+    let (result, refusal) = REFUSAL
+        .scope(RefCell::new(None), async {
+            let result = operation.await;
+            (result, REFUSAL.with(|slot| slot.borrow_mut().take()))
+        })
+        .await;
+    if let Some(refusal) = refusal {
+        return Err(refusal);
+    }
+    result.map_err(|error| {
+        let answer = error.to_auth_response();
+        crate::wire::WireResponse {
+            status: answer.status,
+            body: answer.body,
+        }
+        .into()
+    })
+}
+
 pub(crate) async fn serve(
     auth: &BetterAuth<Schema>,
     request: Request,

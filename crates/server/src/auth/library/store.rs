@@ -93,9 +93,14 @@ fn sql_value(v: Value) -> AuthResult<SqlValue> {
     Ok(match v {
         Value::Null => SqlValue::Null,
         Value::Bool(b) => SqlValue::Integer(b as i64),
-        Value::Number(n) => {
-            SqlValue::Integer(n.as_i64().ok_or_else(|| error("integer out of range"))?)
-        }
+        // The library passes some integer columns as f64, such as an API key's rate window.
+        Value::Number(n) => match (n.as_i64(), n.as_f64()) {
+            (Some(i), _) => SqlValue::Integer(i),
+            (None, Some(f)) if f.fract() == 0.0 && f.abs() < 2f64.powi(53) => {
+                SqlValue::Integer(f as i64)
+            }
+            _ => return Err(error("integer out of range")),
+        },
         Value::String(s) => SqlValue::Text(s),
         v => SqlValue::Text(v.to_string()),
     })
@@ -1032,7 +1037,37 @@ impl TwoFactorStore for LaneStore {
 #[async_trait]
 impl ApiKeyStore for LaneStore {
     async fn create_api_key(&self, input: CreateApiKey) -> AuthResult<ApiKey> {
-        self.run(move |db| { let id=id(); execute(db,"insert into api_key (id,reference_id,config_id,name,prefix,key,start,expires_at,remaining,rate_limit_enabled,rate_limit_time_window,rate_limit_max,refill_interval,refill_amount,permissions,metadata,enabled,created_at,updated_at,request_count) values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?18,0)",vec![json!(id),json!(input.reference_id),json!(input.config_id),json!(input.name),json!(input.prefix),json!(input.key_hash),json!(input.start),optional_millis(input.expires_at)?,json!(input.remaining),json!(input.rate_limit_enabled),json!(input.rate_limit_time_window),json!(input.rate_limit_max),json!(input.refill_interval),json!(input.refill_amount),json!(input.permissions),json!(input.metadata),json!(input.enabled),json!(now())])?; one(db,"select * from api_key where id=?1",vec![json!(id)]) }).await
+        self.run(move |db| {
+            let id = id();
+            // Better Auth's adapter stores a missing metadata JSON-encoded: the text 'null'.
+            let metadata = input.metadata.unwrap_or_else(|| "null".into());
+            execute(
+                db,
+                "insert into api_key (id,reference_id,config_id,name,prefix,key,start,expires_at,remaining,rate_limit_enabled,rate_limit_time_window,rate_limit_max,refill_interval,refill_amount,permissions,metadata,enabled,created_at,updated_at,request_count) values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?18,0)",
+                vec![
+                    json!(id),
+                    json!(input.reference_id),
+                    json!(input.config_id),
+                    json!(input.name),
+                    json!(input.prefix),
+                    json!(input.key_hash),
+                    json!(input.start),
+                    optional_millis(input.expires_at)?,
+                    json!(input.remaining),
+                    json!(input.rate_limit_enabled),
+                    json!(input.rate_limit_time_window),
+                    json!(input.rate_limit_max),
+                    json!(input.refill_interval),
+                    json!(input.refill_amount),
+                    json!(input.permissions),
+                    json!(metadata),
+                    json!(input.enabled),
+                    json!(input.created_at.timestamp_millis()),
+                ],
+            )?;
+            one(db, "select * from api_key where id=?1", vec![json!(id)])
+        })
+        .await
     }
     async fn get_api_key_by_id(&self, id: &str) -> AuthResult<Option<ApiKey>> {
         let id = id.to_owned();
@@ -1098,7 +1133,7 @@ execute(db,"update api_key set name=?1,enabled=?2,remaining=?3,rate_limit_enable
         self.run(move |db| {
             execute(
                 db,
-                "delete from api_key where expires_at<=?1",
+                "delete from api_key where expires_at<?1 and expires_at is not null",
                 vec![json!(now())],
             )
         })
