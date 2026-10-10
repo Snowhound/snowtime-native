@@ -199,7 +199,13 @@ async function replay(server: { url: string; pid: number }, round: string) {
   const after = processUsage(server.pid)
   writeFileSync(join(out, `${round}-generator.log`), (await stdout) + (await stderr))
   writeFileSync(join(out, `${round}-load-samples.json`), JSON.stringify(samples))
-  const summary = json(summaryPath)
+  // --summary-export writes each metric's statistics flat; droppedActions and the checks
+  // below read handleSummary's shape, which nests them under `values`.
+  const summary = {
+    metrics: Object.fromEntries(
+      Object.entries(json(summaryPath).metrics).map(([name, values]) => [name, { values }]),
+    ),
+  }
   const requests = summary.metrics.http_reqs?.values?.count ?? 0
   const errors = Object.entries(summary.metrics).some(
     ([name, metric]) =>
