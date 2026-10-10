@@ -60,3 +60,12 @@ test('CPU counted in clock ticks has a floor of its resolution', () => {
   expect(compareMetric([0.04, 0.04], [0.05, 0.05], 'api/timer/cpu_ms', floors).flagged).toBe(false)
   expect(compareMetric([0.04, 0.04], [0.051, 0.051], 'api/timer/cpu_ms', floors).flagged).toBe(true)
 })
+test('the lowest-round statistic ignores one slowed round on either side', () => {
+  expect(compareMetric([0.22, 0.23], [0.33, 0.23], 'api/timer/cpu_ms', {}, 'lowest').flagged).toBe(
+    false,
+  )
+  expect(compareMetric([0.22, 0.23], [0.33, 0.23], 'api/timer/cpu_ms').flagged).toBe(true)
+  expect(compareMetric([100, 101], [120, 115], 'render/week/cpu_ms', {}, 'lowest').flagged).toBe(
+    true,
+  )
+})

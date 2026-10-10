@@ -264,10 +264,11 @@ async function inside() {
   command('bun', ['install', '--frozen-lockfile', '--ignore-scripts'], 'install.log', {}, ROOT)
   const inputs = join(gate, 'inputs')
   const all: Record<string, Record<string, number>> = {}
-  // The coarsest /proc resolution each CPU metric had in any round.
+  // The coarsest /proc resolution each CPU metric had in any round, doubled: each round's
+  // reading can be off by a tick, so two rounds can differ by two.
   const resolutions: Record<string, number> = {}
   function resolution(metric: string, value: number) {
-    resolutions[metric] = Math.max(resolutions[metric] ?? 0, value)
+    resolutions[metric] = Math.max(resolutions[metric] ?? 0, 2 * value)
   }
   for (const [index, name] of ['baseline', 'current', 'baseline', 'current'].entries()) {
     const round = `${index + 1}-${name}`
@@ -347,6 +348,7 @@ async function inside() {
         [all['2-current'][metric], all['4-current'][metric]],
         metric,
         { render: profile.renderFloor, resolution: resolutions[metric] },
+        profile.statistic,
       ),
     ]),
   )
