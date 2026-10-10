@@ -476,20 +476,32 @@ listener. Caddy remains as the sampler's access point but receives no app reques
 
 ## Performance gate
 
-The quick gate checks a change for regressions in about 1–2 minutes. It runs on Kait's
-Ryzen under WSL, after builds finish, and needs `deploy/load/app.patch` applied to `app/`.
-It It retains the
-starting native server and `render-bench` binaries and alternates fresh processes
-in one session: baseline, current, baseline, current (A/B/A/B). It never rebuilds
-the baseline. Docker confines the gate to CPU 0, one CPU, and 2 GiB with no swap.
-The same container also holds the lightweight client and k6; server CPU comes from
-the server's own `/proc` counters, excluding generator CPU. This is a regression
-check on a shared WSL host, not Hetzner confirmation or whole-host capacity evidence.
+The quick gate checks a change for regressions in about 1–2 minutes. It runs after
+builds finish, on Kait's Ryzen under WSL or on a Mac through Docker Desktop, and needs
+`deploy/load/app.patch` applied to `app/`. It retains the starting native server and
+`render-bench` binaries and alternates fresh processes in one session: baseline,
+current, baseline, current (A/B/A/B). It never rebuilds the baseline. Docker confines
+the gate to one CPU and 2 GiB with no swap. The same container also holds the
+lightweight client and k6; server CPU comes from the server's own `/proc` counters,
+excluding generator CPU. This is a regression check on a shared development machine,
+not Hetzner confirmation or whole-host capacity evidence.
+
+A profile ([`harness/gate/profiles.ts`](harness/gate/profiles.ts)) sets what differs
+between machines: the CPU the container is pinned to, the render count, the floor for
+render CPU and p50, and how each side's two rounds combine. `--profile` selects one;
+the default is `mac` on macOS and `ryzen` elsewhere. Because A and B always run in the
+same session on the same machine, results from different machines are never compared
+with each other, and any machine can run any profile.
+
+| Profile | CPU | Renders | Render CPU and p50 floor | Rounds combine as |
+| ------- | --- | ------- | ------------------------ | ----------------- |
+| `ryzen` | 0   | 25      | 5%                       | mean              |
+| `mac`   | 9   | 35      | 10%                      | lower round       |
 
 [`perf-gate.ts`](harness/perf-gate.ts) reuses `render-bench`, `timings.ts`,
 `api-recording.ts`, `native.ts`, and the existing k6 scenario. Each round measures:
 
-- Timer, week, month, and year: 25 measured renders after the existing 50-page warmup
+- Timer, week, month, and year: the profile's measured renders after the existing 50-page warmup
   and idle collection, one renderer, a 128 MiB heap, and a 32 MiB semi-space. Report
   process CPU per render, p50/p95 latency, and lifetime peak RSS in MiB. The quick
   mode skips only the final idle RSS observation; it retains startup/warmup peaks.
@@ -507,12 +519,12 @@ check on a shared WSL host, not Hetzner confirmation or whole-host capacity evid
   release/strip procedure for both versions. Bun's plain-bundle comparison is not
   part of this native refactor gate.
 
-The defaults aim for 1–2 minutes on the Ryzen after the build. The first run must
-confirm this estimate; no gate timings have been recorded yet, and the gate hasn't run
-since it moved here from snowtime's `081-linux-confirmation` branch. The script records
-elapsed seconds. `--renders`, `--repeats`, and `--rate` change both A and B together.
-Increase repeats if CPU falls below clock-tick resolution; do not lower counts just
-to make a failing measurement fit the time estimate.
+On the Mac (M1 Pro, Docker Desktop with 10 CPUs and 8 GB), a gate run takes 106–110
+seconds at 35 renders; the Ryzen's time isn't recorded yet. Each run records its
+elapsed seconds in `elapsed-seconds.txt`. `--renders`, `--repeats`, and `--rate`
+change both A and B together. Increase repeats if CPU falls below clock-tick
+resolution; do not lower counts just to make a failing measurement fit the time
+estimate.
 
 ### Prepare once, then keep the baseline
 
@@ -596,32 +608,75 @@ checks artifact/input hashes and rejects a checkout that changed after current's
 capture, `app/`'s working tree included. Build-dependency, database-schema, or runtime changes that prevent the old
 binary from running require a new matched baseline; keep the original evidence.
 
+#### On a Mac
+
+The Mac runs the same commands in its own checkout, with no bundle transfer. Docker
+Desktop runs every measured process in its Linux VM; the `mac` profile pins CPU 9, so
+the VM needs 10 CPUs (Settings, Resources), or pass another profile. The gate was
+calibrated with 10 CPUs and 8 GB. Install, build, and apply the patch as above, then
+keep the Mac awake with `caffeinate -i` in place of the PowerShell step:
+
+```sh
+caffeinate -i bun harness/scaling/kit-baseline.ts --prepare \
+  --date="$(date -u +%F)" --recording=app/perf/.cache/stress/kit-pages.json
+caffeinate -i bun harness/perf-gate.ts --freeze
+caffeinate -i bun harness/perf-gate.ts --calibrate
+```
+
+`--date` selects a preserved M dataset; a past date with none fails, so use today's.
+The Mac's `app/node_modules` holds macOS builds, so before measuring, the gate installs
+the app's Linux packages (frozen, without scripts) into the Docker volume
+`snowtime-perf-gate-node-modules` and mounts it over `app/node_modules` in the
+container. The first run fills the volume; later runs find nothing to install. Close
+other heavy work, and leave other containers idle, before measuring.
+
+Docker Desktop's CPUs are macOS threads, which macOS moves between performance and
+efficiency cores and deschedules for moments. Identical runs vary 6–10% in render CPU
+and p50, and single rounds are slowed by 10–45%, hence the `mac` profile's wider render
+floor and its lower-round rule. A stall can also exceed the server's report admission
+budget (one running, four waiting), which answers 503 and makes the round invalid;
+rerun it. On 2026-10-10, `--calibrate` passed with attempts 3 and 4 of 4, the second
+flagging the timer render's CPU and p95.
+
+When you finish, restore `app/`. The command keeps the ignored `app/perf/.cache/`, so
+the baseline and run evidence stay:
+
+```sh
+git -C app checkout -- . && git -C app clean -fd -- perf deploy
+```
+
 ### Results and regression rule
 
-The gate prints and saves a table of baseline/current means, deltas, observed noise
-bands, and flags. Each band is the larger of `abs(A1 - A2)` and its minimum floor:
+The gate prints and saves a table of baseline and current values, deltas, observed
+noise bands, and flags. Each side's value is the mean of its two rounds, or under the
+`mac` profile the lower round. Each band is the larger of `abs(A1 - A2)` and its
+minimum floor:
 
-| Metric                  | Minimum floor, relative to mean(A) |
-| ----------------------- | ---------------------------------- |
-| CPU                     | 5%                                 |
-| p95 latency             | 10%                                |
-| p50 latency             | 5%                                 |
-| Server-Timing medians   | Larger of 5% and 0.1 ms            |
-| RSS                     | Larger of 5% and 4 MiB             |
-| Binary and bundle sizes | 5%                                 |
+| Metric                     | Minimum floor, relative to A                    |
+| -------------------------- | ----------------------------------------------- |
+| Render CPU and p50 latency | The profile's: 5% (`ryzen`), 10% (`mac`)        |
+| API and load CPU (`/proc`) | Larger of 5% and two clock ticks over the calls |
+| p95 latency                | 10%                                             |
+| Server-Timing medians      | Larger of 5% and 0.1 ms                         |
+| RSS                        | Larger of 5% and 4 MiB                          |
+| Binary and bundle sizes    | 5%                                              |
 
-A regression is `mean(B) - mean(A) > band`. Server-Timing's absolute floor matches
-`timing.rs`'s one-decimal resolution, so a 0.0 to 0.1 ms change stays within the band.
-Lower values are better for every metric.
-This two-round band is a quick review rule, not
-a statistical confidence interval. Short p95 samples can be noisy; investigate a
-flag with a repeat in an idle session before attributing it to the refactor.
+A regression is `B - A > band`. Server-Timing's absolute floor matches `timing.rs`'s
+one-decimal resolution, so a 0.0 to 0.1 ms change stays within the band. `/proc`
+counts CPU in clock ticks, and each round's reading can be off by one, so two rounds
+can differ by two ticks with no change: with 1,000 calls and 100 ticks a second, that
+is 0.02 ms per call. Lower values are better for every metric, and interference only
+slows a round, so the lower round is the cleaner measurement where the host
+interrupts. This two-round band is a quick review rule, not a statistical confidence
+interval. Short p95 samples can be noisy; investigate a flag with a repeat in an idle
+session before attributing it to the refactor.
 
 `--calibrate` runs A/B/A/B with the retained baseline artifacts in both positions.
 It does not replace current artifacts or rebuild anything, so it also works after
 updating only the gate's scripts. Each regression resets the consecutive-pass count.
-It stops after two consecutive passes, or stops with exit code 2 on invalid generator
-evidence or a setup error. Keep the Ryzen awake and idle throughout the sequence.
+It stops after two consecutive passes, with exit code 1 after six attempts without
+them, or with exit code 2 on invalid generator evidence or a setup error. Keep the
+machine awake and idle throughout the sequence.
 The calibration folder retains every attempt, its flagged metrics and exit code,
 and `calibration.json` with the final streak. A standalone identical check uses
 `--identical`. The 2026-10-08 noise-floor amendment is implemented; its two passing
