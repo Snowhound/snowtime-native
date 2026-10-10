@@ -49,17 +49,62 @@ pub(crate) async fn serve(
     *response.status_mut() =
         StatusCode::from_u16(answer.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     for (name, value) in answer.headers.iter() {
-        if let (Ok(name), Ok(value)) = (
-            HeaderName::try_from(name.as_str()),
-            HeaderValue::try_from(value.as_str()),
-        ) {
+        if let (Ok(name), Some(value)) = (HeaderName::try_from(name.as_str()), latin1(value)) {
             response.headers_mut().append(name, value);
         }
     }
     response
 }
 
-fn auth_request(request: Request, headers: &HeaderMap) -> AuthRequest {
+/// A header value as fetch's ByteString writes it: one Latin-1 byte per character.
+fn latin1(value: &str) -> Option<HeaderValue> {
+    let bytes: Option<Vec<u8>> = value.chars().map(|c| u8::try_from(c as u32).ok()).collect();
+    HeaderValue::from_bytes(&bytes?).ok()
+}
+
+/// The app's `encodeCallbackUrls` hook: Better Auth writes callback URLs into Latin-1
+/// `Location` headers, so wider characters are percent-encoded before the state stores
+/// them. The body's other bytes and key order stay as sent.
+fn encode_callback_urls(path: &str, body: &mut Vec<u8>) {
+    if path != "/api/auth/sign-in/social" && path != "/api/auth/link-social" {
+        return;
+    }
+    let Ok(mut fields) = serde_json::from_slice::<
+        indexmap::IndexMap<String, Box<serde_json::value::RawValue>>,
+    >(body) else {
+        return;
+    };
+    let mut changed = false;
+    for field in ["callbackURL", "errorCallbackURL", "newUserCallbackURL"] {
+        let Some(value) = fields
+            .get(field)
+            .and_then(|raw| serde_json::from_str::<String>(raw.get()).ok())
+            .filter(|value| value.chars().any(|c| c as u32 > 255))
+        else {
+            continue;
+        };
+        let mut encoded = String::new();
+        for character in value.chars() {
+            if character as u32 <= 255 {
+                encoded.push(character);
+            } else {
+                for byte in character.encode_utf8(&mut [0; 4]).bytes() {
+                    encoded.push_str(&format!("%{byte:02X}"));
+                }
+            }
+        }
+        if let Ok(raw) = serde_json::value::to_raw_value(&encoded) {
+            fields.insert(field.to_owned(), raw);
+            changed = true;
+        }
+    }
+    if changed && let Ok(rewritten) = serde_json::to_vec(&fields) {
+        *body = rewritten;
+    }
+}
+
+fn auth_request(mut request: Request, headers: &HeaderMap) -> AuthRequest {
+    encode_callback_urls(&request.path, &mut request.body);
     let method = match request.method.as_str() {
         "POST" => HttpMethod::Post,
         "PUT" => HttpMethod::Put,
@@ -85,6 +130,13 @@ fn auth_request(request: Request, headers: &HeaderMap) -> AuthRequest {
                 joined.push_str(value);
             })
             .or_insert_with(|| value.to_owned());
+    }
+    // AuthCall turns a form body into JSON, as Better Auth reads either.
+    if fields
+        .get("content-type")
+        .is_some_and(|value| value.starts_with("application/x-www-form-urlencoded"))
+    {
+        fields.insert("content-type".into(), "application/json".into());
     }
     if let Some(ip) = request.client_ip {
         fields.insert(CLIENT_IP.into(), ip);

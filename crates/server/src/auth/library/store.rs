@@ -1,4 +1,5 @@
 use super::Schema;
+use crate::auth::login_domains;
 use crate::http::App;
 use async_trait::async_trait;
 use better_auth_core::{
@@ -67,10 +68,7 @@ impl LaneStore {
         }
     }
     fn allowed(&self, email: &str) -> bool {
-        self.domains.is_empty()
-            || email.rsplit_once('@').is_some_and(|(_, domain)| {
-                self.domains.iter().any(|d| d.eq_ignore_ascii_case(domain))
-            })
+        login_domains::allowed(&self.domains, email)
     }
 }
 pub(crate) fn error(e: impl std::fmt::Display) -> AuthError {
@@ -174,10 +172,11 @@ pub(crate) fn execute(db: &Connection, sql: &str, args: Vec<Value>) -> AuthResul
     db.execute(sql, params_from_iter(args)).map_err(error)
 }
 pub(crate) fn now() -> i64 {
-    Utc::now().timestamp_millis()
+    crate::clock::now()
 }
+/// A UUIDv7 at the host's clock, as the app's `generateId` makes them.
 pub(crate) fn id() -> String {
-    uuid::Uuid::now_v7().to_string()
+    crate::auth::session::uuid_v7(now())
 }
 fn millis(value: &str) -> AuthResult<i64> {
     Ok(DateTime::parse_from_rfc3339(value)
@@ -232,21 +231,29 @@ pub(crate) fn slug_check(slug: &str) -> AuthResult<()> {
     }
     Ok(())
 }
+fn domain_refusal() -> AuthError {
+    AuthError::Upstream {
+        status: 403,
+        code: login_domains::REFUSAL_CODE,
+        message: login_domains::REFUSAL_MESSAGE,
+    }
+}
 pub(crate) fn create_user(
     db: &Connection,
     input: CreateUser,
     domains: &[String],
 ) -> AuthResult<UserView> {
     let email = input.email.unwrap_or_default().to_lowercase();
-    if !domains.is_empty()
-        && !email
-            .rsplit_once('@')
-            .is_some_and(|(_, d)| domains.iter().any(|v| v.eq_ignore_ascii_case(d)))
-    {
-        return Err(AuthError::bad_request("LOGIN_DOMAIN_NOT_ALLOWED"));
+    // The app's `user.create.before` hooks: the login domains, then refuseUnverifiedSignUp.
+    if !login_domains::allowed(domains, &email) {
+        return Err(domain_refusal());
     }
     if input.email_verified != Some(true) {
-        return Err(AuthError::bad_request("EMAIL_NOT_VERIFIED"));
+        return Err(AuthError::Upstream {
+            status: 403,
+            code: "EMAIL_UNVERIFIED",
+            message: "The sign-in provider hasn't verified this account's email address.",
+        });
     }
     let user_id = input.id.unwrap_or_else(id);
     execute(
@@ -273,14 +280,9 @@ pub(crate) fn create_session(
         "select * from user where id=?1",
         vec![json!(input.user_id)],
     )?;
-    if !domains.is_empty()
-        && !user
-            .email
-            .as_deref()
-            .and_then(|e| e.rsplit_once('@'))
-            .is_some_and(|(_, d)| domains.iter().any(|v| v.eq_ignore_ascii_case(d)))
-    {
-        return Err(AuthError::bad_request("LOGIN_DOMAIN_NOT_ALLOWED"));
+    // The app's `session.create.before` hook.
+    if !login_domains::allowed(domains, user.email.as_deref().unwrap_or_default()) {
+        return Err(domain_refusal());
     }
     use rand::RngExt;
     const ALPHABET: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -296,8 +298,12 @@ pub(crate) fn create_session(
             json!(input.user_id),
             json!(token),
             json!(input.expires_at.timestamp_millis()),
-            json!(input.ip_address),
-            json!(input.user_agent),
+            // As the app's session check stores them: an empty string when absent, and
+            // the user agent bounded (task 081.31).
+            json!(input.ip_address.unwrap_or_default()),
+            json!(crate::auth::bounds::user_agent(
+                input.user_agent.as_deref().unwrap_or_default()
+            )),
             json!(input.active_organization_id),
             json!(now()),
         ],
@@ -639,14 +645,21 @@ impl VerificationStore<Schema> for LaneStore {
         identifier: &str,
     ) -> AuthResult<Option<VerificationView>> {
         let identifier = identifier.to_owned();
-        self.read(move |db| {
-            Ok(query(
+        // As better-auth's findVerificationValue: the newest row, then expired rows go.
+        self.run(move |db| {
+            let found = query(
                 db,
-                "select * from verification where identifier=?1 order by created_at desc",
+                "select * from verification where identifier=?1 order by created_at desc limit 1",
                 vec![json!(identifier)],
             )?
             .into_iter()
-            .next())
+            .next();
+            execute(
+                db,
+                "delete from verification where expires_at < ?1",
+                vec![json!(now())],
+            )?;
+            Ok(found)
         })
         .await
     }

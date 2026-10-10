@@ -3943,6 +3943,7 @@ dependencies = [
  "hmac 0.13.0",
  "icu_collator",
  "icu_locale_core",
+ "indexmap 2.14.2",
  "jiff",
  "libc",
  "openssl",

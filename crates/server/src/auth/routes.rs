@@ -152,19 +152,19 @@ async fn passkey_delete(call: AuthCall) -> Response {
 }
 
 async fn social(call: AuthCall) -> axum::response::Response {
-    call.oauth(super::oauth::Action::SignIn).await
+    call.library().await
 }
 async fn link_social(call: AuthCall) -> axum::response::Response {
-    call.oauth(super::oauth::Action::Link).await
+    call.library().await
 }
 async fn accounts(call: AuthCall) -> axum::response::Response {
-    call.oauth(super::oauth::Action::List).await
+    call.library().await
 }
 async fn unlink(call: AuthCall) -> axum::response::Response {
-    call.oauth(super::oauth::Action::Unlink).await
+    call.library().await
 }
 async fn callback(call: AuthCall) -> axum::response::Response {
-    call.oauth(super::oauth::Action::Callback).await
+    call.library().await
 }
 
 async fn profile(call: AuthCall) -> Response {

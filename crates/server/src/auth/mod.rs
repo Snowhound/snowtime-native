@@ -20,7 +20,6 @@ mod error_page;
 mod invitations;
 pub(crate) mod library;
 mod login_domains;
-pub(crate) mod oauth;
 mod ordered_json;
 mod organization;
 pub(crate) mod passkeys;

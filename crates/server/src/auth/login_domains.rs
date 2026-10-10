@@ -53,10 +53,16 @@ impl App {
         self: Arc<Self>,
         request: &Request,
     ) -> Result<(), Response> {
-        if self.config.sign_in_page.allowed_domains.is_empty() || request.cookie.is_none() {
+        self.login_domain_check(request.cookie.clone()).await
+    }
+    /// The middleware's check of a request's `Cookie` header.
+    pub(crate) async fn login_domain_check(
+        self: Arc<Self>,
+        cookie: Option<String>,
+    ) -> Result<(), Response> {
+        if self.config.sign_in_page.allowed_domains.is_empty() || cookie.is_none() {
             return Ok(());
         }
-        let cookie = request.cookie.clone();
         let app = self.clone();
         // On a reader, as the API's session check reads; only renewal or expiry takes the
         // writer, and only when it's free.

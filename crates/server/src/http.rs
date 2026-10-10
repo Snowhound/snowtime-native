@@ -771,12 +771,6 @@ impl AuthCall {
     pub(crate) async fn auth_write(self, action: crate::auth::writes::Action) -> Response {
         self.0.auth_write(self.1, self.2, action).await
     }
-    pub(crate) async fn oauth(
-        self,
-        action: crate::auth::oauth::Action,
-    ) -> axum::response::Response {
-        self.0.oauth(self.1, self.2, action).await
-    }
     pub(crate) async fn passkey(self, action: crate::auth::passkeys::Action) -> Response {
         self.0.passkey(self.1, self.2, action).await
     }

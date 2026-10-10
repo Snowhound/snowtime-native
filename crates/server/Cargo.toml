@@ -29,6 +29,7 @@ base64.workspace = true
 form_urlencoded.workspace = true
 governor = "0.10"
 hmac.workspace = true
+indexmap = { version = "2", features = ["serde"] }
 icu_collator.workspace = true
 icu_locale_core.workspace = true
 jiff.workspace = true

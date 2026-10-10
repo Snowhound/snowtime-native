@@ -2,13 +2,18 @@
 //! store on the host's lanes. The router sends a route here once the library serves it;
 //! passkeys, password sign-in, and the per-request cookie check stay app code.
 mod bridge;
+mod policy;
+mod providers;
 mod store;
 #[cfg(test)]
 mod tests;
 mod transaction;
 
 use crate::http::App;
-use better_auth::{AuthConfig, BetterAuth, plugins::SessionManagementPlugin};
+use better_auth::{
+    AuthConfig, BetterAuth,
+    plugins::{AccountManagementPlugin, OAuthPlugin, SessionManagementPlugin},
+};
 use better_auth_core::{
     middleware::{CsrfConfig, RateLimitConfig},
     schema::AuthSchema,
@@ -23,6 +28,10 @@ pub use store::LaneStore;
 const TRANSACTION_DEADLINE: Duration = Duration::from_secs(5);
 
 pub(crate) async fn build(app: &Arc<App>) -> BetterAuth<Schema> {
+    // The library follows the host's clock, which PERF_NOW moves in bench builds.
+    let _ = better_auth_core::time::set_clock(|| {
+        chrono::DateTime::from_timestamp_millis(crate::clock::now()).unwrap_or_default()
+    });
     let mut config = AuthConfig::new(app.config.secret.clone())
         .base_url(app.config.app_origin())
         .base_path("/api/auth");
@@ -30,6 +39,12 @@ pub(crate) async fn build(app: &Arc<App>) -> BetterAuth<Schema> {
         config.session.cookie_name = "__Secure-better-auth.session_token".into();
     }
     config.advanced.ip_address.headers = vec![bridge::CLIENT_IP.into()];
+    config.session.expires_in = chrono::Duration::days(30);
+    let oauth = providers::providers(&app.config)
+        .into_iter()
+        .fold(OAuthPlugin::new(), |plugin, (id, provider)| {
+            plugin.add_provider(&id, provider)
+        });
     let store = LaneStore::new(
         Arc::downgrade(app),
         app.session.allowed_domains.clone(),
@@ -43,7 +58,12 @@ pub(crate) async fn build(app: &Arc<App>) -> BetterAuth<Schema> {
             ..Default::default()
         })
         .csrf(CsrfConfig::new())
+        .plugin(policy::Policy {
+            app: Arc::downgrade(app),
+        })
         .plugin(SessionManagementPlugin::new())
+        .plugin(oauth)
+        .plugin(AccountManagementPlugin::new())
         .build()
         .await
         .expect("better-auth-rs accepts the app's configuration")
