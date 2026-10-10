@@ -1,6 +1,11 @@
+# The better-auth-rs fork while Cargo.toml patches it by path (task 081.39). The performance
+# gate passes the fork's committed tree as this context; other builds copy nothing.
+FROM scratch AS better-auth-rs
+
 FROM rust:1.99-trixie AS build
 RUN apt-get update && apt-get install -y --no-install-recommends clang
 WORKDIR /src
+COPY --from=better-auth-rs / /better-auth-rs/
 COPY Cargo.toml Cargo.lock rust-toolchain.toml /src/
 COPY crates /src/crates
 COPY adapter /src/adapter
