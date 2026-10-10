@@ -619,7 +619,7 @@ impl App {
                 return r;
             }
             if let Err(r) =
-                super::sign_out::check_urls(&request, Some(&body), self.config.app_origin())
+                super::callback_urls::check_urls(&request, Some(&body), self.config.app_origin())
             {
                 return r;
             }

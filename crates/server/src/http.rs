@@ -105,6 +105,8 @@ pub struct App {
     pub(crate) config: Config,
     pub(crate) session: SessionConfig,
     rate_limits: MemoryStore,
+    // Built on first use: its store holds a weak reference back to this app.
+    better_auth: tokio::sync::OnceCell<better_auth::BetterAuth<crate::auth::library::Schema>>,
     #[cfg(feature = "bench")]
     reader_stats: Mutex<std::collections::BTreeMap<String, serde_json::Value>>,
 }
@@ -166,10 +168,18 @@ impl App {
             db: Mutex::new(db),
             session,
             rate_limits: MemoryStore::new(config.rate_limit),
+            better_auth: tokio::sync::OnceCell::new(),
             config,
             #[cfg(feature = "bench")]
             reader_stats: Mutex::default(),
         }))
+    }
+    pub(crate) async fn better_auth(
+        self: &Arc<Self>,
+    ) -> &better_auth::BetterAuth<crate::auth::library::Schema> {
+        self.better_auth
+            .get_or_init(|| crate::auth::library::build(self))
+            .await
     }
     pub(crate) fn db(&self) -> MutexGuard<'_, Connection> {
         self.db.lock().unwrap_or_else(|e| e.into_inner())
@@ -727,7 +737,7 @@ impl Public<Empty> {
 
 /// A call of Better Auth's own routes. Better Auth checks the origin itself, by its own
 /// rules, and refuses in its own format, so the API's origin rule doesn't apply.
-pub struct AuthCall(Arc<App>, Request, crate::auth::FetchHeaders);
+pub struct AuthCall(Arc<App>, Request, crate::auth::FetchHeaders, HeaderMap);
 impl FromRequest<Arc<App>> for AuthCall {
     type Rejection = Response;
     async fn from_request(
@@ -735,6 +745,7 @@ impl FromRequest<Arc<App>> for AuthCall {
         app: &Arc<App>,
     ) -> std::result::Result<Self, Response> {
         let fetch = crate::auth::FetchHeaders::of(request.headers());
+        let headers = request.headers().clone();
         let form = request
             .headers()
             .get(header::CONTENT_TYPE)
@@ -748,10 +759,15 @@ impl FromRequest<Arc<App>> for AuthCall {
             }
             request.body = serde_json::to_vec(&fields).unwrap();
         }
-        Ok(Self(app.clone(), request, fetch))
+        Ok(Self(app.clone(), request, fetch, headers))
     }
 }
 impl AuthCall {
+    /// Served by better-auth-rs.
+    pub(crate) async fn library(self) -> axum::response::Response {
+        let auth = self.0.better_auth().await;
+        crate::auth::library::serve(auth, self.1, &self.3).await
+    }
     pub(crate) async fn auth_write(self, action: crate::auth::writes::Action) -> Response {
         self.0.auth_write(self.1, self.2, action).await
     }
@@ -769,9 +785,6 @@ impl AuthCall {
     }
     pub(crate) async fn sign_in(self) -> Response {
         self.0.sign_in(self.1, self.2).await
-    }
-    pub(crate) async fn sign_out(self) -> Response {
-        self.0.sign_out(self.1, self.2).await
     }
     pub(crate) async fn error_page(self) -> axum::response::Response {
         self.0.error_page(self.1).await

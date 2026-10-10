@@ -109,8 +109,8 @@ pub fn better_auth_routes() -> Router<Arc<App>> {
             post(auth_accept),
         )
 }
-async fn sign_out(call: AuthCall) -> Response {
-    call.sign_out().await
+async fn sign_out(call: AuthCall) -> axum::response::Response {
+    call.library().await
 }
 async fn sign_in(call: AuthCall) -> Response {
     call.sign_in().await

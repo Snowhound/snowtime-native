@@ -34,3 +34,10 @@ sha2 = "0.11"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal"] }
 unicode-normalization = "0.1"
 uuid = { version = "1", features = ["v7"] }
+
+# The fork's fixes on top of the pinned better-auth-rs commit, each offered upstream (task
+# 081.39). A local path until Kait approves pushing the fork; then its URL and exact commit.
+[patch."https://github.com/better-auth-rs/better-auth-rs"]
+better-auth = { path = "../better-auth-rs" }
+better-auth-core = { path = "../better-auth-rs/crates/core" }
+better-auth-api = { path = "../better-auth-rs/crates/api" }
