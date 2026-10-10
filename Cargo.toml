@@ -36,8 +36,8 @@ unicode-normalization = "0.1"
 uuid = { version = "1", features = ["v7"] }
 
 # The fork's fixes on top of the pinned better-auth-rs commit, each offered upstream (task
-# 081.39). A local path until Kait approves pushing the fork; then its URL and exact commit.
+# 081.39, docs/tasks/better-auth-rs/upstream.md).
 [patch."https://github.com/better-auth-rs/better-auth-rs"]
-better-auth = { path = "../better-auth-rs" }
-better-auth-core = { path = "../better-auth-rs/crates/core" }
-better-auth-api = { path = "../better-auth-rs/crates/api" }
+better-auth = { git = "https://github.com/kaitk/better-auth-rs", rev = "1bf73a2c3f7c7e48d74d6dc8267f715082acfb1d" }
+better-auth-core = { git = "https://github.com/kaitk/better-auth-rs", rev = "1bf73a2c3f7c7e48d74d6dc8267f715082acfb1d" }
+better-auth-api = { git = "https://github.com/kaitk/better-auth-rs", rev = "1bf73a2c3f7c7e48d74d6dc8267f715082acfb1d" }

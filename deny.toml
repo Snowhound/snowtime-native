@@ -53,5 +53,9 @@ deny = [
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-# better-auth-rs master at an exact commit until a release carries it (task 081.39).
-allow-git = ["https://github.com/better-auth-rs/better-auth-rs"]
+# better-auth-rs master at an exact commit until a release carries it, and the fork the
+# workspace patches it with until upstream takes its fixes (task 081.39).
+allow-git = [
+  "https://github.com/better-auth-rs/better-auth-rs",
+  "https://github.com/kaitk/better-auth-rs",
+]

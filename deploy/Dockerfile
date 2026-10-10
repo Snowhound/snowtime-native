@@ -7,10 +7,6 @@
 #   docker build -f deploy/Dockerfile --build-arg BIN=snowtime-axum -t snowtime-native:bench .
 #
 # Base images are pinned by digest, the Rust image to rust-toolchain.toml's version.
-# The better-auth-rs fork while Cargo.toml patches it by path (task 081.39). The performance
-# gate passes the fork's committed tree as this context; other builds copy nothing.
-FROM scratch AS better-auth-rs
-
 FROM rust:1.99-trixie@sha256:6ff07edce8775d0f64be7aba9197229407301bddf2054d62c27b541a6238a181 AS build
 RUN apt-get update && apt-get install -y --no-install-recommends clang perl make && rm -rf /var/lib/apt/lists/*
 # The V8 library, checked against a pinned hash, rather than the v8 build script's unchecked
@@ -19,7 +15,6 @@ COPY deploy/v8-archive.sh Cargo.lock /tmp/v8/
 RUN /tmp/v8/v8-archive.sh /tmp/v8/Cargo.lock /opt/librusty_v8.a.gz && rm -r /tmp/v8
 ENV RUSTY_V8_ARCHIVE=/opt/librusty_v8.a.gz
 WORKDIR /src
-COPY --from=better-auth-rs / /better-auth-rs/
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY crates crates
 COPY adapter/bootstrap.js adapter/api-trace.js adapter/

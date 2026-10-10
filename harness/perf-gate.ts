@@ -69,23 +69,6 @@ function command(
   if (result.status !== 0) throw new Error(`${program} exited ${result.status}; see ${log}`)
   return result.stdout
 }
-// The images' build context can't reach the better-auth-rs fork beside this repository,
-// which Cargo.toml patches in by path until it is pushed (task 081.39), so the builds get
-// its committed tree, exported into the run's evidence.
-function forkContext() {
-  if (!readFileSync(join(PORT, 'Cargo.toml'), 'utf8').includes('path = "../better-auth-rs"')) {
-    return []
-  }
-  const tree = join(out, 'better-auth-rs')
-  mkdirSync(tree)
-  command('git', ['-C', '../better-auth-rs', 'rev-parse', 'HEAD'], 'fork-commit.txt')
-  command(
-    'sh',
-    ['-c', 'git -C ../better-auth-rs archive HEAD | tar -x -C "$1"', 'sh', tree],
-    'fork-export.log',
-  )
-  return ['--build-context', `better-auth-rs=${tree}`]
-}
 function json(path: string) {
   return JSON.parse(readFileSync(path, 'utf8'))
 }
@@ -528,12 +511,10 @@ async function main() {
     } else if (values['build-current']) {
       command('bun', ['--bun', 'run', 'build'], 'app-build.log', {}, ROOT)
       command('bun', ['adapter/build.ts'], 'bundle-build.log')
-      const fork = forkContext()
       command(
         'docker',
         [
           'build',
-          ...fork,
           '-f',
           'deploy/Dockerfile',
           '--build-arg',
@@ -548,7 +529,6 @@ async function main() {
         'docker',
         [
           'build',
-          ...fork,
           '-f',
           'adapter/bench/Dockerfile',
           '-t',

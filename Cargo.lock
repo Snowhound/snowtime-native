@@ -453,6 +453,7 @@ dependencies = [
 [[package]]
 name = "better-auth"
 version = "1.0.0-alpha.3"
+source = "git+https://github.com/kaitk/better-auth-rs?rev=1bf73a2c3f7c7e48d74d6dc8267f715082acfb1d#1bf73a2c3f7c7e48d74d6dc8267f715082acfb1d"
 dependencies = [
  "argon2",
  "async-trait",
@@ -473,6 +474,7 @@ dependencies = [
 [[package]]
 name = "better-auth-api"
 version = "1.0.0-alpha.3"
+source = "git+https://github.com/kaitk/better-auth-rs?rev=1bf73a2c3f7c7e48d74d6dc8267f715082acfb1d#1bf73a2c3f7c7e48d74d6dc8267f715082acfb1d"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -508,6 +510,7 @@ dependencies = [
 [[package]]
 name = "better-auth-core"
 version = "1.0.0-alpha.3"
+source = "git+https://github.com/kaitk/better-auth-rs?rev=1bf73a2c3f7c7e48d74d6dc8267f715082acfb1d#1bf73a2c3f7c7e48d74d6dc8267f715082acfb1d"
 dependencies = [
  "argon2",
  "async-trait",
@@ -537,6 +540,7 @@ dependencies = [
 [[package]]
 name = "better-auth-macros"
 version = "1.0.0-alpha.3"
+source = "git+https://github.com/kaitk/better-auth-rs?rev=1bf73a2c3f7c7e48d74d6dc8267f715082acfb1d#1bf73a2c3f7c7e48d74d6dc8267f715082acfb1d"
 dependencies = [
  "proc-macro2",
  "quote",
