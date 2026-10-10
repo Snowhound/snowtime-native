@@ -3,7 +3,9 @@
 Drafts only. Nothing here has been filed or pushed; each waits for Kait's approval. The
 fork is the local branch `snowtime` of `better-auth-rs`, on `master` at `9f91cd7`
 (2026-09-30). Upstream's compatibility harness pins better-auth `1.7.6`; the app runs
-`1.7.7`. Each pull request below is one fork commit.
+`1.7.7`. Pull requests 1–6 below were drafted at sign-out; the fork also carries the OAuth fixes
+listed at the end, not yet drafted. Commit IDs changed with a rebase on 2026-10-10; see
+`git log 9f91cd7..snowtime` in the fork.
 
 ## Pull requests
 
@@ -84,3 +86,18 @@ aren't found. Smaller gaps seen while reading, not yet verified against a runnin
   in better-auth (`error=EMAIL_UNVERIFIED&error_description=...`); the library
   stringifies store errors into `error=<message>` and keeps the code only for banned
   users.
+
+## OAuth fixes in the fork, to draft
+
+- State as better-auth 1.7 stores and checks it (the issue above), cookie strategy still
+  a JWT rather than the encrypted payload.
+- Zod-order validation of `/sign-in/social`, `/link-social`, and the POST callback.
+- Built-in providers' default scopes before requested ones; scopes merged on relink and
+  kept on sign-in.
+- `list-accounts` key order; `UNAUTHORIZED` from signed-out account and link calls
+  (`require_session_middleware`); `email_does_not_match`.
+- GitHub's token exchange follows redirects (`OAuthProvider::follow_token_redirects`).
+- A database hook's `APIError` redirects with its code and message.
+- `unlink-account` requires a fresh session (`require_fresh_session_middleware`, a day by
+  default as in better-auth).
+- `time::now` and `set_clock`, in place of every `Utc::now()`.

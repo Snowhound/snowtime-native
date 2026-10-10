@@ -1,6 +1,6 @@
 # 081.39: Auth through better-auth-rs, with passkeys beside it
 
-Status: stopped at OAuth, awaiting Kait (2026-10-10)
+Status: in progress (2026-10-10): sign-out and OAuth on the library; API keys and the measurements next
 
 Move the port's auth onto better-auth-rs, the intended library ([question 5](README.md),
 Kait, 2026-10-06), on a branch, and measure what it costs. This applies the kit's auth
@@ -106,18 +106,43 @@ The release `bench` binary on macOS arm64, stripped, grows from 73,952,656 bytes
 `sha2`, `hmac`, and `base64`, plus `clap`, `serde_yaml`, `totp-rs`, and `aes-gcm` from
 plugins and a CLI the port doesn't mount. The gate's Linux sizes are pending its run.
 
-### OAuth: stopped
+### OAuth (`433d762`)
 
-The library's OAuth state follows the pre-1.7 protocol: UUID states under `oauth:`, a
-JWT state cookie, no `oauthState`, other error codes, and a 43-character verifier. The
-comparison's flow fails at its first check (state format), and better-auth's rows and
-cookies don't interoperate. Matching 1.7.7 means rewriting the state module and the
-start and callback paths for both strategies. Two smaller gaps sit behind it: scope
-order and hook refusals' redirect codes. Details are in the
-[OAuth issue draft](better-auth-rs/upstream.md#issue-oauth-state-follows-the-pre-17-protocol).
-The provider wiring tried (Google and Microsoft profiles from the ID token, Microsoft's
-Graph photo, the fake provider's transport) is saved, uncommitted, in
-`temp/081.39/oauth-experiment.patch`.
+Kait chose to fix the library's OAuth in the fork (2026-10-10). Sign-in, linking, the
+callback, `list-accounts`, and `unlink-account` go to the library's OAuth and account
+plugins. The fork rewrote the state layer to better-auth 1.7's protocol and fixed eleven
+smaller gaps; [upstream.md](better-auth-rs/upstream.md) lists them. App code beside the
+library: `library/providers.rs` (Google's and Microsoft's ID-token profiles, Microsoft's
+Graph photo, the fake provider's transport), `library/policy.rs` (the login-domain
+middleware and the app's input bounds), the store's hook refusals (`EMAIL_UNVERIFIED`,
+`LOGIN_DOMAIN_NOT_ALLOWED`), and the bridge's Latin-1 headers and callback-URL encoding.
+The library follows the host's clock through the fork's `time::set_clock`, so `PERF_NOW`
+moves it as it moves the app. The bar is unchanged: conformance 66/570/13, `compare.ts`
+1,490 byte-equal (128 OAuth calls), hardening 17. The native `oauth.rs` (1,370 lines) and
+its validators are removed.
 
-Kait to choose: fix the state layer in the fork and offer it upstream, keep 081.28's
-OAuth beside the library, or wait for upstream.
+### Organizations: kept as app code
+
+Mounting the library's organization plugin matched 38 of 141 auth-writes steps. Beyond
+key order and validation messages, its role and permission behavior differs from
+better-auth's: a member could remove themselves, an unknown role was saved, an admin
+couldn't rename the organization. Kait chose (2026-10-10) to keep 081.28's organization,
+invitation, and profile writes as app code beside the library, measure the whole port,
+and then decide between better-auth-rs and promoting 081.28's port to a kit crate. The
+attempt is saved in `temp/081.39/org-experiment.patch`; `temp/081.39/scripts/writes-debug.ts`
+prints every differing auth-writes step even when the flow throws.
+
+### Next
+
+1. API keys through the library's server-only operations (`ApiKeyPlugin::create_key`,
+   `update_key`, `verify_api_key`), with its HTTP key endpoints closed; check that
+   verification's per-call usage writes match the app's (`api-keys-compare.ts`).
+2. Before measuring: build the library at startup rather than on first request (a bad
+   configuration now panics per request), run the compatibility harness
+   (`compat-tests/reference-server` needs its packages installed), regenerate
+   `THIRD_PARTY_LICENSES`, and update the line counts and binary size here.
+3. Apply `deploy/load/app.patch`, `bun harness/perf-gate.ts --build-current`, then
+   `caffeinate -i bun harness/perf-gate.ts`; record the table and flags here, repeat a
+   flag in an idle session, and restore `app/`.
+4. Nothing is pushed, here or in the fork, until the perf and memory runs (Kait,
+   2026-10-10).
