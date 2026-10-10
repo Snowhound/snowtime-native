@@ -101,3 +101,11 @@ aren't found. Smaller gaps seen while reading, not yet verified against a runnin
 - `unlink-account` requires a fresh session (`require_fresh_session_middleware`, a day by
   default as in better-auth).
 - `time::now` and `set_clock`, in place of every `Utc::now()`.
+
+## API key fix in the fork, to draft
+
+- The plugin reads a key's creation time before its expiry and passes it in
+  `CreateApiKey::created_at` (`e2595fb2`), as better-auth's insert reads `createdAt` before
+  `expiresAt`; the store used to read its own clock after the expiry, so a key's lifetime
+  could come out a millisecond short. The compat server sets `follow_token_redirects`
+  (`796d9d91`).

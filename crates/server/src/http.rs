@@ -181,6 +181,10 @@ impl App {
             .get_or_init(|| crate::auth::library::build(self))
             .await
     }
+    /// Builds better-auth-rs, which otherwise starts on the first request that needs it.
+    pub async fn start_auth(self: &Arc<Self>) {
+        self.better_auth().await;
+    }
     pub(crate) fn db(&self) -> MutexGuard<'_, Connection> {
         self.db.lock().unwrap_or_else(|e| e.into_inner())
     }

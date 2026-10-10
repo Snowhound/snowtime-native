@@ -60,10 +60,13 @@ gate hasn't run.
 
 `Cargo.toml` names better-auth-rs `master` at `9f91cd7` (2026-09-30), whose
 compatibility harness pins better-auth `1.7.6`. A workspace `[patch]` points it at the
-local fork (`../better-auth-rs`, branch `snowtime`, eight commits on `9f91cd7`), so
+local fork (`../better-auth-rs`, branch `snowtime`, 20 commits on `9f91cd7`), so
 `Cargo.lock` records path packages until Kait approves pushing the fork; then the patch
-names the fork's URL and commit. CI can't build the branch before that. The library's
-own compatibility harness hasn't run at the fork's head. Pull requests and the OAuth
+names the fork's URL and commit. CI can't build the branch before that. At the fork's
+head (`796d9d91`) the library's compatibility harness passes: the dual-server client suite
+against better-auth 1.7.6 (`full_client_compat` and `configuration_client_compat`) and the
+workspace tests with Axum, SeaORM, and Redis (669). It runs without devenv once both
+compat directories have their packages installed. Pull requests and the OAuth
 issue are drafted in [better-auth-rs/upstream.md](better-auth-rs/upstream.md), none filed.
 
 The library adds no SeaORM or sqlx. Two fork features keep the host's crypto: reqwest
@@ -157,14 +160,22 @@ render 18, Clippy and cargo-deny both ways, cargo-audit. `api_keys.rs` drops fro
 249 lines (key generation, the insert, and the expired-key cleanup); the library side
 adds about 100.
 
+### Before measuring
+
+The host builds the library at startup (`App::start_auth`), so a configuration it
+refuses stops the server instead of failing each request. `THIRD_PARTY_LICENSES` is
+unchanged: the API key plugin was already in the graph. Since `47b74fc`, the server's
+auth code grows from 8,246 to 8,665 lines (tests included): `library/` adds 2,208,
+`callback_urls.rs` 101 moved out of the removed code, and `oauth.rs` (1,370),
+`sign_out.rs` (183), and most of the OAuth and sign-out schemas (about 300) are gone. The
+stripped release `bench` binary on macOS arm64 is 78,072,464 bytes, up 4,119,808 (5.6%)
+from `47b74fc`. The bar is unchanged after both: conformance 66/570/13, `compare.ts` 1,490,
+server 128, host 36, Clippy both ways.
+
 ### Next
 
-1. Before measuring: build the library at startup rather than on first request (a bad
-   configuration now panics per request), run the compatibility harness
-   (`compat-tests/reference-server` needs its packages installed), regenerate
-   `THIRD_PARTY_LICENSES`, and update the line counts and binary size here.
-2. Apply `deploy/load/app.patch`, `bun harness/perf-gate.ts --build-current`, then
+1. Apply `deploy/load/app.patch`, `bun harness/perf-gate.ts --build-current`, then
    `caffeinate -i bun harness/perf-gate.ts`; record the table and flags here, repeat a
    flag in an idle session, and restore `app/`.
-3. Nothing is pushed, here or in the fork, until the perf and memory runs (Kait,
+2. Nothing is pushed, here or in the fork, until the perf and memory runs (Kait,
    2026-10-10).
