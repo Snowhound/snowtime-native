@@ -20,7 +20,7 @@ deploy/        the release image, the V8 archive script, and the load harness pa
 docs/          the port's architecture and the 081 records
 ```
 
-Pinned at snowtime `54ae90f`, `main`'s head on 2026-10-10. The pin records which of the
+Pinned at snowtime `981832f`, `main`'s head on 2026-10-10. The pin records which of the
 app's features the port implements and which client bundle it serves. A `main` commit
 that doesn't change the port's output in a meaningful way, such as tests, tooling, or
 docs, can move the pin with no porting once the bar passes. The pin doesn't have to

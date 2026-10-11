@@ -31,7 +31,11 @@ async fn list_api_keys(call: AsUser<Empty>) -> Response {
     call.run(super::api_keys::list_api_keys).await
 }
 async fn create_api_key(call: AsUser<CreateApiKeyInput>) -> Response {
-    call.run(super::api_keys::create_api_key).await
+    call.then_library(
+        super::api_keys::check_api_key_room,
+        super::api_keys::issue_api_key,
+    )
+    .await
 }
 async fn revoke_api_key(call: AsUser<RevokeApiKeyInput>) -> Response {
     call.run(super::api_keys::revoke_api_key).await
@@ -109,8 +113,8 @@ pub fn better_auth_routes() -> Router<Arc<App>> {
             post(auth_accept),
         )
 }
-async fn sign_out(call: AuthCall) -> Response {
-    call.sign_out().await
+async fn sign_out(call: AuthCall) -> axum::response::Response {
+    call.library().await
 }
 async fn sign_in(call: AuthCall) -> Response {
     call.sign_in().await
@@ -152,19 +156,19 @@ async fn passkey_delete(call: AuthCall) -> Response {
 }
 
 async fn social(call: AuthCall) -> axum::response::Response {
-    call.oauth(super::oauth::Action::SignIn).await
+    call.library().await
 }
 async fn link_social(call: AuthCall) -> axum::response::Response {
-    call.oauth(super::oauth::Action::Link).await
+    call.library().await
 }
 async fn accounts(call: AuthCall) -> axum::response::Response {
-    call.oauth(super::oauth::Action::List).await
+    call.library().await
 }
 async fn unlink(call: AuthCall) -> axum::response::Response {
-    call.oauth(super::oauth::Action::Unlink).await
+    call.library().await
 }
 async fn callback(call: AuthCall) -> axum::response::Response {
-    call.oauth(super::oauth::Action::Callback).await
+    call.library().await
 }
 
 async fn profile(call: AuthCall) -> Response {

@@ -16,7 +16,7 @@ fn config() -> Config {
     Config {
         database_path: String::new(),
         app_url: "http://snowtime.test".into(),
-        secret: "test-secret".into(),
+        secret: "test-secret-of-at-least-32-characters".into(),
         password_enabled: false,
         production: false,
         sign_in_page: Default::default(),
@@ -57,7 +57,7 @@ async fn sign_out_expires_cookies_and_deletes_only_the_signed_session() {
         .unwrap();
     let cookie = format!(
         "better-auth.session_token={}",
-        crate::auth::cookie::sign("token", "test-secret")
+        crate::auth::cookie::sign("token", "test-secret-of-at-least-32-characters")
     );
     let response = router(app.clone())
         .oneshot(
@@ -80,6 +80,42 @@ async fn sign_out_expires_cookies_and_deletes_only_the_signed_session() {
             .unwrap(),
         "other-token"
     );
+}
+// better-auth-rs makes a store error a 500; the bridge answers with the lane's own refusal.
+#[tokio::test]
+async fn sign_out_answers_the_writer_lanes_refusal() {
+    let app = App::open_with_limits(
+        Config {
+            database_path: ":memory:".into(),
+            ..config()
+        },
+        0,
+        crate::Limits {
+            hashes: 1,
+            queue_timeout: std::time::Duration::from_millis(30),
+            max_waiting: 4,
+        },
+    )
+    .unwrap();
+    tables(&app);
+    let held = app.write_gate.acquire().await.unwrap();
+    let response = router(app.clone())
+        .oneshot(
+            HttpRequest::builder()
+                .method("POST")
+                .uri("/api/auth/sign-out")
+                .header("cookie", cookie(&app, "token"))
+                .header("origin", "http://snowtime.test")
+                .header("content-type", "application/json")
+                .body(Body::from("{}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    drop(held);
+    assert_eq!(response.status(), 503);
+    assert_eq!(response.headers()["retry-after"], "1");
+    assert_eq!(response.headers().get_all("set-cookie").iter().count(), 0);
 }
 fn tables(app: &App) {
     app.db()

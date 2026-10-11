@@ -34,3 +34,10 @@ sha2 = "0.11"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal"] }
 unicode-normalization = "0.1"
 uuid = { version = "1", features = ["v7"] }
+
+# The fork's fixes on top of the pinned better-auth-rs commit, each offered upstream (task
+# 081.39, docs/tasks/better-auth-rs/upstream.md).
+[patch."https://github.com/better-auth-rs/better-auth-rs"]
+better-auth = { git = "https://github.com/kaitk/better-auth-rs", rev = "1508ab7977892857f1deee1f69b73e0f8704b6f4" }
+better-auth-core = { git = "https://github.com/kaitk/better-auth-rs", rev = "1508ab7977892857f1deee1f69b73e0f8704b6f4" }
+better-auth-api = { git = "https://github.com/kaitk/better-auth-rs", rev = "1508ab7977892857f1deee1f69b73e0f8704b6f4" }
