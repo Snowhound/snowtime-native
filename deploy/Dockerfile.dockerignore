@@ -11,3 +11,5 @@ crates/render/results
 !adapter/dist
 !deploy/v8-archive.sh
 !app/src/lib/holidays/ee.json
+!app/drizzle
+!app/deploy/compose/Caddyfile

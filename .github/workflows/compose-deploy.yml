@@ -1,0 +1,153 @@
+# Builds the server and Caddy images, pushes them to GHCR, and deploys them to a Compose
+# server (deploy/compose/README.md). Runs only when started from the Actions tab.
+name: Compose deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      server:
+        description: 'After pushing the images: restart pulls them and replaces the running stack; pull only stops before that'
+        type: choice
+        options: [restart, pull only, skip]
+        default: restart
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compose-deploy
+  cancel-in-progress: false
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      release: ${{ steps.release.outputs.release }}
+      registry: ${{ steps.release.outputs.registry }}
+    steps:
+      # app/ is the snowtime submodule at the pinned commit.
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      # GHCR names must be lowercase; the owner's may not be.
+      - id: release
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          echo "release=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "registry=ghcr.io/${OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: app/package.json
+
+      # The image copies the render bundle and public files built here (deploy/Dockerfile).
+      - name: Render bundle
+        run: |
+          bun install --cwd app --frozen-lockfile
+          bun install --cwd adapter --frozen-lockfile
+          (cd app && bun --bun run build)
+          bun adapter/build.ts
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Server image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/Dockerfile
+          target: app
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.release.outputs.registry }}/snowtime-native:${{ steps.release.outputs.release }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Caddy image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/Dockerfile
+          target: caddy
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.release.outputs.registry }}/snowtime-native-caddy:${{ steps.release.outputs.release }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+
+  deploy:
+    needs: images
+    if: inputs.server != 'skip'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Repository secrets prefixed COMPOSE_ (deploy/compose/README.md). packages: read lets the
+    # server pull the images with this job's token.
+    permissions:
+      contents: read
+      packages: read
+    env:
+      RELEASE: ${{ needs.images.outputs.release }}
+      REGISTRY: ${{ needs.images.outputs.registry }}
+      DEPLOY_TARGET: ${{ secrets.COMPOSE_DEPLOY_USER }}@${{ secrets.COMPOSE_DEPLOY_HOST }}
+      DEPLOY_PATH: ${{ secrets.COMPOSE_DEPLOY_PATH }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.COMPOSE_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.COMPOSE_SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519
+
+      # The server's Compose files follow the deployed commit; .env and litestream.env stay on it.
+      - name: Copy Compose files
+        run: scp deploy/compose/compose.yml deploy/compose/litestream.yml "$DEPLOY_TARGET:$DEPLOY_PATH/"
+
+      # The token reaches the server on stdin, so it never shows in a process list.
+      - name: Pull images
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" |
+            ssh "$DEPLOY_TARGET" docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          ssh "$DEPLOY_TARGET" bash -s -- "$DEPLOY_PATH" "$RELEASE" "$REGISTRY" <<'SCRIPT'
+          set -euo pipefail
+          trap 'docker logout ghcr.io' EXIT
+          cd "$1"
+          for setting in "RELEASE=$2" "IMAGE_REGISTRY=$3"; do
+            if grep -q "^${setting%%=*}=" .env; then
+              sed -i "s|^${setting%%=*}=.*|$setting|" .env
+            else
+              echo "$setting" >> .env
+            fi
+          done
+          docker compose pull
+          SCRIPT
+
+      # Startup applies migrations, and --wait fails the job unless the app turns healthy.
+      # The project name matches the TypeScript stack's, so this also replaces that stack.
+      - name: Restart
+        if: inputs.server == 'restart'
+        run: |
+          ssh "$DEPLOY_TARGET" bash -s -- "$DEPLOY_PATH" <<'SCRIPT'
+          set -euo pipefail
+          cd "$1"
+          docker compose stop app
+          docker compose up -d --no-build --force-recreate --wait
+          docker compose ps
+          SCRIPT

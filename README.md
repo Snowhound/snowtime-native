@@ -16,7 +16,8 @@ crates/        server (rules and Axum router), render (V8), host (the snowtime-a
 adapter/       the render bundle's build, run on app/'s toolchain, and its benchmarks
 harness/       the byte comparisons, the conformance runner, and the native server starter
 conformance/   conformance tests the app hasn't taken yet
-deploy/        the release image, the V8 archive script, and the load harness patch
+deploy/        the release images, the Compose deployment, the V8 archive script, and
+               the load harness patch
 docs/          the port's architecture and the 081 records
 ```
 
@@ -236,6 +237,9 @@ Perl and make. The optional Docker stage installs those and `linux-perf` for pro
 
 ## Run it
 
+To run it on a server with Docker Compose, with optional Litestream backups to
+S3-compatible storage, see [deploy/compose/README.md](deploy/compose/README.md).
+
 The native host reads inherited environment variables only. It doesn't load `.env`
 files or accept configuration through command-line arguments. Loading a dotenv file,
 with inherited variables taking precedence, is a possible future option; it isn't
@@ -259,7 +263,7 @@ With `MIGRATE_ON_START=true`, the server migrates the database before it listens
 server's standalone entry does. It refuses to start if an applied migration was edited
 or deleted (`app/scripts/db-verify.ts`), applies the pending ones in one transaction, and
 records them in `__drizzle_migrations` as drizzle-orm does, so either backend can migrate
-the database the other runs. The image doesn't include `drizzle/`; mount `app/drizzle`.
+the database the other runs. The release image includes `app/drizzle` as `/app/drizzle`.
 
 ```sh
 cargo build --release --bin snowtime-axum --features bench
