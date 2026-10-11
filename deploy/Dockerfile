@@ -2,7 +2,8 @@
 # render bundle, its manifest, and the same build's public files must be built on the host
 # first (README.md, "Server rendering"); the image serves those public files. BIN picks the
 # host binary; perf:stress --app=native builds it as snowtime-native:bench
-# (deploy/load/README.md).
+# (deploy/load/README.md). The caddy target is the Compose deployment's proxy
+# (deploy/compose/README.md), with the same build's public files.
 #
 #   docker build -f deploy/Dockerfile --build-arg BIN=snowtime-axum -t snowtime-native:bench .
 #
@@ -42,6 +43,13 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     && cp target/release/examples/scrypt-bench /scrypt-bench
 ENTRYPOINT ["/scrypt-bench"]
 
+# The app's Caddyfile expects the public files at /srv/snowtime. Their hashed names differ
+# from the TypeScript build's, so this image can't be swapped for the app's Caddy image.
+FROM caddy:2.11.4@sha256:0c994536bddb66445885237f1a5dcc1916bccea922661c76b4e9fc24061f9b52 AS caddy
+COPY adapter/dist/public /srv/snowtime
+COPY app/deploy/compose/Caddyfile /etc/caddy/Caddyfile
+
+# The last stage, so a build without --target makes the server image.
 FROM debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f AS app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
@@ -51,6 +59,8 @@ RUN apt-get update \
 # Named snowtime, as the release image names it, so the bench sampler finds the process.
 COPY --from=build /server /app/snowtime
 COPY adapter/dist/public /app/public
+# MIGRATE_ON_START=true with MIGRATIONS_DIR=/app/drizzle migrates on startup.
+COPY app/drizzle /app/drizzle
 COPY THIRD_PARTY_LICENSES /usr/share/doc/snowtime/THIRD_PARTY_LICENSES
 ENV HOST=0.0.0.0 PORT=3000 EDGE_STATIC_DIR=/app/public
 USER snowtime

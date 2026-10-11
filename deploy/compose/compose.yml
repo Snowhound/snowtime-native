@@ -1,0 +1,78 @@
+# The native server behind Caddy, with optional Litestream backups (README.md). The project
+# name and services match the app's deploy/compose/compose.yml, so either stack can replace
+# the other on one server and keep the database, which both migrate, and Caddy's certificates.
+name: snowtime
+services:
+  app:
+    image: ${IMAGE_REGISTRY:-ghcr.io/snowhound}/snowtime-native:${RELEASE:?Set RELEASE in .env}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      TURSO_DATABASE_URL: file:/data/snowtime.db
+      BETTER_AUTH_URL: https://${APP_HOST:?Set APP_HOST in .env}
+      CLIENT_IP_HEADER: cf-connecting-ip
+      MIGRATE_ON_START: 'true'
+      MIGRATIONS_DIR: /app/drizzle
+    volumes:
+      - app_data:/data
+    expose:
+      - '3000'
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://localhost:3000/sign-in']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+  caddy:
+    image: ${IMAGE_REGISTRY:-ghcr.io/snowhound}/snowtime-native-caddy:${RELEASE:?Set RELEASE in .env}
+    restart: unless-stopped
+    environment:
+      APP_HOST: ${APP_HOST:?Set APP_HOST in .env}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+  # Runs with COMPOSE_PROFILES=backup in .env. Its bucket keys stay in litestream.env, out
+  # of the app's environment.
+  litestream:
+    profiles: [backup]
+    image: litestream/litestream:0.5.17@sha256:4b02b9859a6b6b4087d8b8944e15f7e984bd7957cba322bbeee38b0e27b9656a
+    command: replicate
+    restart: unless-stopped
+    # The app's user, so Litestream can write its state beside the database.
+    user: '10001:10001'
+    env_file: litestream.env
+    volumes:
+      - app_data:/data
+      - ./litestream.yml:/etc/litestream.yml:ro
+    # The app creates and migrates the database before Litestream opens it.
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+volumes:
+  app_data:
+    name: ${DATABASE_VOLUME:-snowtime_data}
+  caddy_data:
+  caddy_config:

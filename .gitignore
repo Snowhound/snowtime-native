@@ -11,3 +11,7 @@ __pycache__/
 
 # Session notes and handovers, not committed
 /temp/
+
+# A local Compose deployment's settings and bucket keys
+/deploy/compose/.env
+/deploy/compose/litestream.env
