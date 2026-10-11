@@ -315,7 +315,7 @@ which records the edge measurements.
   cookie check, and scrypt sign-in beside it, measured against the Mac gate's baseline
   (done)
 - [40](40-passkey-plugin.md): passkeys through better-auth-rs's plugin, compared with the
-  app's module before Kait decides (todo)
+  app's module: 44 of 151 steps matched, so the module stays (done)
 - [41](41-kit-auth-crates.md): the kit's first crates: the lane, the auth store and
   bridge, and the cookie, session check, and scrypt, with snowtime-native as their first
   consumer (todo)

@@ -642,7 +642,7 @@ impl VerificationStore<Schema> for LaneStore {
     ) -> AuthResult<Option<VerificationView>> {
         let identifier = identifier.to_owned();
         let value = value.to_owned();
-        self.run(move |db| { let rows:Vec<VerificationView>=query(db,"delete from verification where id=(select id from verification where identifier=?1 and value=?2 order by created_at desc limit 1) returning *",vec![json!(identifier),json!(value)])?; Ok(rows.into_iter().next().filter(|v|v.expires_at>Utc::now())) }).await
+        self.run(move |db| { let rows:Vec<VerificationView>=query(db,"delete from verification where id=(select id from verification where identifier=?1 and value=?2 order by created_at desc limit 1) returning *",vec![json!(identifier),json!(value)])?; Ok(rows.into_iter().next().filter(|v|v.expires_at>better_auth_core::time::now())) }).await
     }
     async fn consume_verification_by_identifier(
         &self,
@@ -656,7 +656,9 @@ impl VerificationStore<Schema> for LaneStore {
                 vec![json!(identifier)],
             )?;
             rows.sort_by_key(|v| v.created_at);
-            Ok(rows.pop().filter(|v| v.expires_at > Utc::now()))
+            Ok(rows
+                .pop()
+                .filter(|v| v.expires_at > better_auth_core::time::now()))
         })
         .await
     }
