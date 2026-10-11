@@ -15,5 +15,6 @@ serves sign-out, OAuth, and API key creation, pinned to the fork
 [`kaitk/better-auth-rs`](https://github.com/kaitk/better-auth-rs) at an exact commit
 while its fixes wait upstream. Organizations, invitations, profile writes, passkeys,
 password sign-in, and the per-request cookie check stay app code: the library's
-organization roles and passkey verification policy differ from Better Auth's, and it
-hashes passwords with Argon2 where Better Auth uses scrypt.
+organization roles differ from Better Auth's, the passkey module from 081.28 was kept
+(Kait, 2026-10-10), and the library hashes passwords with Argon2 where Better Auth uses
+scrypt.
