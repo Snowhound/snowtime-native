@@ -43,8 +43,9 @@ from the tag `archive/081-native-poc`, before 081.37 removed them.
       passes at the pin (adoption gate 4).
 - [ ] Performance: `perf-gate.ts --build-current`, then the gate with the `mac` profile
       against the baseline frozen at `5a5cb9b` on 2026-10-10; the table and any flags are
-      recorded here. Then the full kit baseline (README, "Prepare once, then keep the
-      baseline").
+      recorded here. The full kit baseline on the Ryzen stays open in
+      [081.01](01-server-rendering.md#baseline-before-the-kit-refactor), outside this task
+      (Kait, 2026-10-11).
 - [ ] Recorded here: the auth code the library replaced and what stays, in lines; binary
       size; upstream gaps found, with issues or pull requests filed. The porting kit gets a
       recipe either way: the library where it fits, an app-owned recipe where it doesn't.
@@ -260,7 +261,9 @@ this branch keeps. Forward-port any app features added since by rerunning the ba
 Kait chose (2026-10-10) to keep better-auth-rs, with organizations, invitations, and
 profile writes, passkeys, and password sign-in as app code beside it.
 
-1. Write the kit's auth recipe: the library for sessions, OAuth, and API key creation;
-   app code for organizations, passkeys, and password sign-in.
-2. If upstream hasn't engaged with the OAuth state issue after a few weeks, reconsider
+1. The kit's auth recipe is written: `recipes/auth/better-auth.md` in the porting kit
+   (2026-10-11).
+2. Open before this task closes: the upstream issue or pull request for the passkey
+   plugin's user-verification policy (acceptance criteria), not filed yet.
+3. If upstream hasn't engaged with the OAuth state issue after a few weeks, reconsider
    promoting 081.28's port to a kit crate (Rollback above).
