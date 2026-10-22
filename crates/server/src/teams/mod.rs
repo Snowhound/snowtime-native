@@ -409,10 +409,10 @@ mod tests {
     #[test]
     fn role_schema_checks_ids_before_role() {
         assert!(
-            matches!(decode::<SetTeamRoleInput>(json!({"teamId":"bad","userId":null,"role":"owner"})),Err(Error::Invalid(message)) if message=="Invalid id.")
+            matches!(decode::<SetTeamRoleInput>(json!({"teamId":"bad","userId":null,"role":"owner"})),Err(Error::Invalid(invalid)) if invalid.message =="Invalid id.")
         );
         assert!(
-            matches!(decode::<CreateTeamInput>(json!({"name":"😀".repeat(51)})),Err(Error::Invalid(message)) if message=="Use at most 100 characters.")
+            matches!(decode::<CreateTeamInput>(json!({"name":"😀".repeat(51)})),Err(Error::Invalid(invalid)) if invalid.message =="Use at most 100 characters.")
         );
     }
 }

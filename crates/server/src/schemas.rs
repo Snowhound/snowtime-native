@@ -5,7 +5,7 @@ pub(crate) use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 pub(crate) use crate::calendar::Day;
-pub(crate) use crate::errors::{Error, Result};
+pub(crate) use crate::errors::{Error, Invalid, Param, Result};
 pub(crate) use crate::timestamp::Timestamp;
 
 // The longest an entry runs (MAX_ENTRY_HOURS).
@@ -28,7 +28,10 @@ pub fn decode<T: DeserializeOwned + Validate>(value: Value) -> Result<T> {
     for &(name, field) in T::FIELDS {
         check_field(name, field, value.get(name))?;
     }
-    let mut input: T = serde_json::from_value(value).map_err(|e| Error::Invalid(e.to_string()))?;
+    let mut input: T = match serde_json::from_value(value) {
+        Ok(input) => input,
+        Err(e) => return invalid(e.to_string()),
+    };
     input.validate()?;
     Ok(input)
 }
@@ -197,9 +200,99 @@ pub(crate) fn check_field(name: &str, field: Field, value: Option<&Value>) -> Re
     ))
 }
 
+/// A refusal of valibot's own checks, which carry no key of their own.
 pub(crate) fn invalid<T>(message: impl Into<String>) -> Result<T> {
-    Err(Error::Invalid(message.into()))
+    Err(Error::Invalid(Invalid {
+        key: "validation_invalid",
+        params: None,
+        message: message.into(),
+    }))
 }
+
+/// A schema message by its key (keyed in src/server/schemas.ts), with the English text.
+pub(crate) fn refuse_input<T>(key: &'static str) -> Result<T> {
+    Err(keyed(key, None))
+}
+
+/// A keyed schema message with its one parameter, such as `max` for validation_too_long.
+pub(crate) fn refuse_input_with<T>(
+    key: &'static str,
+    name: &'static str,
+    param: Param,
+) -> Result<T> {
+    Err(keyed(key, Some((name, param))))
+}
+
+fn keyed(key: &'static str, params: Option<(&'static str, Param)>) -> Error {
+    let template = ENGLISH
+        .iter()
+        .find(|(k, _)| *k == key)
+        .map(|(_, text)| *text)
+        .unwrap_or_else(|| panic!("no English text for {key}"));
+    let message = match &params {
+        Some((name, Param::Number(n))) => template.replace(&format!("{{{name}}}"), &n.to_string()),
+        Some((name, Param::Text(t))) => template.replace(&format!("{{{name}}}"), t),
+        None => template.to_owned(),
+    };
+    Error::Invalid(Invalid {
+        key,
+        params,
+        message,
+    })
+}
+
+/// The app's English schema messages (messages/en.json), which the API answers whatever the
+/// request's locale; a test compares them with the pinned app's file.
+const ENGLISH: &[(&str, &str)] = &[
+    ("validation_color_format", "Use a color like #4E79A7."),
+    (
+        "validation_copy_duration_pattern",
+        "Use H, M, or S, in at most 40 characters.",
+    ),
+    ("validation_date_format", "Use a date such as 2026-09-24."),
+    ("validation_date_unknown", "Unknown date."),
+    ("validation_email", "Enter a valid email address."),
+    (
+        "validation_end_before_start",
+        "The end must be after the start.",
+    ),
+    (
+        "validation_entry_too_long",
+        "An entry can be at most {hours} hours long.",
+    ),
+    ("validation_invalid_id", "Invalid id."),
+    (
+        "validation_issue_links_https",
+        "Enter an https:// address, such as https://yourcompany.atlassian.net/browse/{key}.",
+    ),
+    (
+        "validation_issue_links_key",
+        "Put {key} where the ticket key goes, such as …/browse/{key}.",
+    ),
+    (
+        "validation_member_or_team",
+        "Pick a member or a team, not both.",
+    ),
+    ("validation_name_required", "Enter a name."),
+    (
+        "validation_range_end_before_start",
+        "The range must end after it starts.",
+    ),
+    (
+        "validation_range_too_long",
+        "The range can span at most {days} days.",
+    ),
+    (
+        "validation_ticket_format",
+        "Use a ticket key such as ABC-123.",
+    ),
+    (
+        "validation_time_zone_format",
+        "Use a time zone such as Europe/Tallinn.",
+    ),
+    ("validation_time_zone_unknown", "Unknown time zone."),
+    ("validation_too_long", "Use at most {max} characters."),
+];
 
 /// A field that may be absent, null, or set: an update changes only the fields present,
 /// and null removes a value.
@@ -242,7 +335,7 @@ fn uuid_v7(id: &str) -> Result<()> {
     if valid {
         Ok(())
     } else {
-        invalid("Invalid id.")
+        refuse_input("validation_invalid_id")
     }
 }
 
@@ -255,7 +348,7 @@ pub(crate) fn js_whitespace(c: char) -> bool {
 }
 fn description_length(text: &str) -> Result<()> {
     if trimmed(text).encode_utf16().count() > 500 {
-        return invalid("Use at most 500 characters.");
+        return refuse_input_with("validation_too_long", "max", Param::Number(500));
     }
     Ok(())
 }
@@ -263,10 +356,10 @@ pub(crate) fn name(text: &str) -> Result<()> {
     let mut text = text.to_owned();
     trim(&mut text);
     if text.is_empty() {
-        return invalid("Enter a name.");
+        return refuse_input("validation_name_required");
     }
     if text.encode_utf16().count() > 100 {
-        return invalid("Use at most 100 characters.");
+        return refuse_input_with("validation_too_long", "max", Param::Number(100));
     }
     Ok(())
 }
@@ -281,10 +374,10 @@ pub(crate) fn trim(text: &mut String) {
 // IsoDate: the form valibot's isoDate checks, then a day the month has.
 fn iso_date(text: &str) -> Result<()> {
     if !Day::is_iso_form(text) {
-        return invalid("Use a date such as 2026-09-24.");
+        return refuse_input("validation_date_format");
     }
     if Day::parse(text).is_none() {
-        return invalid("Unknown date.");
+        return refuse_input("validation_date_unknown");
     }
     Ok(())
 }
@@ -308,7 +401,7 @@ fn ticket_key(key: &str) -> Result<()> {
     if valid {
         Ok(())
     } else {
-        invalid("Use a ticket key such as ABC-123.")
+        refuse_input("validation_ticket_format")
     }
 }
 
@@ -337,6 +430,41 @@ mod tests {
     use crate::projects::schemas::*;
     use crate::timer::schemas::*;
     use serde_json::json;
+
+    fn body(error: Error) -> String {
+        let Error::Invalid(invalid) = error else {
+            panic!("a validation refusal")
+        };
+        String::from_utf8(crate::wire::invalid_failure(invalid).body).unwrap()
+    }
+
+    // validationRefusal in the app's src/server/http.server.ts (task 095).
+    #[test]
+    fn refusals_answer_key_params_and_english_message_in_order() {
+        let too_long = refuse_input_with::<()>("validation_too_long", "max", Param::Number(500));
+        assert_eq!(
+            body(too_long.unwrap_err()),
+            r#"{"error":{"key":"validation_too_long","params":{"max":500},"message":"Use at most 500 characters."}}"#
+        );
+        assert_eq!(
+            body(refuse_input::<()>("validation_invalid_id").unwrap_err()),
+            r#"{"error":{"key":"validation_invalid_id","message":"Invalid id."}}"#
+        );
+        assert_eq!(
+            body(invalid::<()>("Invalid input: Received Object").unwrap_err()),
+            r#"{"error":{"key":"validation_invalid","message":"Invalid input: Received Object"}}"#
+        );
+    }
+
+    #[test]
+    fn english_messages_match_the_pinned_app() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../app/messages/en.json");
+        let app: serde_json::Map<String, Value> =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        for (key, text) in ENGLISH {
+            assert_eq!(app.get(*key).and_then(Value::as_str), Some(*text), "{key}");
+        }
+    }
 
     #[test]
     fn checks_ids_and_tickets() {
@@ -383,11 +511,11 @@ mod tests {
             Some(false)
         );
         assert_eq!(archived(json!({ "organizationId": "o" })).ok(), Some(false));
-        let Err(Error::Invalid(message)) = archived(json!({ "includeArchived": "yes" })) else {
+        let Err(Error::Invalid(invalid)) = archived(json!({ "includeArchived": "yes" })) else {
             panic!("a flag that isn't true or false fails");
         };
         assert_eq!(
-            message,
+            invalid.message,
             r#"Invalid type: Expected boolean but received "yes""#
         );
     }

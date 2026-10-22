@@ -6,7 +6,7 @@ use crate::rate_limit::{MemoryStore, WRITES_PER_USER};
 use crate::schemas::{Empty, Validate, decode};
 use crate::scope::{Scope, resolve_scope};
 use crate::timing::Timer;
-use crate::wire::{app_failure, failure, ok};
+use crate::wire::{app_failure, failure, invalid_failure, ok};
 use crate::{AppError, Code, Config, Error, Key, Result, WireResponse, clock};
 use axum::{
     Extension, Router,
@@ -320,9 +320,7 @@ fn input(request: &Request) -> Result<Value> {
     } else if request.body.is_empty() {
         Map::new()
     } else {
-        match serde_json::from_slice(&request.body)
-            .map_err(|_| Error::Invalid("The body is not JSON.".into()))?
-        {
+        match serde_json::from_slice(&request.body).map_err(|_| Error::NotJson)? {
             Value::Object(fields) => fields,
             _ => Map::new(),
         }
@@ -360,7 +358,8 @@ fn respond(db: &Connection, result: Result<WireResponse>) -> Response {
 fn respond_error(error: Error) -> Response {
     match error {
         Error::App(e) => app_failure(e).into(),
-        Error::Invalid(e) => failure(400, &e).into(),
+        Error::Invalid(invalid) => invalid_failure(invalid).into(),
+        Error::NotJson => failure(400, "The body is not JSON.").into(),
         Error::Database(e) => {
             eprintln!("[api] {e}");
             failure(500, "Internal error.").into()

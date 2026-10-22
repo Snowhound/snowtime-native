@@ -44,15 +44,17 @@ impl Validate for ReportInput {
     ];
     fn validate(&mut self) -> Result<()> {
         if self.to <= self.from {
-            return invalid("The range must end after it starts.");
+            return refuse_input("validation_range_end_before_start");
         }
         if self.to.0 - self.from.0 > MAX_REPORT_DAYS {
-            return invalid(format!(
-                "The range can span at most {MAX_REPORT_DAYS} days."
-            ));
+            return refuse_input_with(
+                "validation_range_too_long",
+                "days",
+                Param::Number(MAX_REPORT_DAYS),
+            );
         }
         if self.user_id.is_some() && self.team_id.is_some() {
-            return invalid("Pick a member or a team, not both.");
+            return refuse_input("validation_member_or_team");
         }
         Ok(())
     }
@@ -256,13 +258,13 @@ impl Validate for ReportExportInput {
     ];
     fn validate(&mut self) -> Result<()> {
         if self.to <= self.from {
-            return invalid("The range must end after it starts.");
+            return refuse_input("validation_range_end_before_start");
         }
         if self.from < self.report.from || self.to > self.report.to {
             return invalid("Invalid input: Received Object");
         }
         if self.to.0 - self.from.0 > 31 {
-            return invalid("The range can span at most 31 days.");
+            return refuse_input_with("validation_range_too_long", "days", Param::Number(31));
         }
         Ok(())
     }
@@ -384,7 +386,7 @@ mod tests {
         .err()
         .unwrap();
         assert!(
-            matches!(error, Error::Invalid(message) if message == "The range must end after it starts.")
+            matches!(error, Error::Invalid(invalid) if invalid.message == "The range must end after it starts.")
         );
         let error = decode::<ReportExportInput>(json!({
             "report": { "from": "2026-09-21", "to": "2026-09-28" },
@@ -393,7 +395,7 @@ mod tests {
         .err()
         .unwrap();
         assert!(
-            matches!(error, Error::Invalid(message) if message == "Invalid input: Received Object")
+            matches!(error, Error::Invalid(invalid) if invalid.message == "Invalid input: Received Object")
         );
         let error = decode::<ReportEntryTotalsInput>(json!({
             "report": { "from": "2026-09-21", "to": "2026-09-28" },
@@ -402,7 +404,7 @@ mod tests {
         .err()
         .unwrap();
         assert!(
-            matches!(error, Error::Invalid(message) if message == r#"Invalid type: Expected ("project" | "team" | "member" | "ticket") but received undefined"#)
+            matches!(error, Error::Invalid(invalid) if invalid.message == r#"Invalid type: Expected ("project" | "team" | "member" | "ticket") but received undefined"#)
         );
     }
 

@@ -76,12 +76,42 @@ pub struct AppError {
     pub key: Key,
 }
 
-/// How a call fails: on purpose, on input its schema refuses (valibot's ValiError, with the
-/// message the client shows), or unexpectedly.
+/// Input its schema refuses, as validationRefusal in src/server/http.server.ts answers it:
+/// the message's key and parameter, which the client translates, and the message in English.
+#[derive(Debug, Serialize)]
+pub struct Invalid {
+    pub key: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none", serialize_with = "params")]
+    pub params: Option<(&'static str, Param)>,
+    pub message: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum Param {
+    Number(i64),
+    Text(&'static str),
+}
+
+fn params<S: serde::Serializer>(
+    value: &Option<(&'static str, Param)>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    use serde::ser::SerializeMap;
+    let mut map = serializer.serialize_map(Some(1))?;
+    if let Some((name, param)) = value {
+        map.serialize_entry(name, param)?;
+    }
+    map.end()
+}
+
+/// How a call fails: on purpose, on input its schema refuses (valibot's ValiError), on a
+/// body that isn't JSON, or unexpectedly.
 #[derive(Debug)]
 pub enum Error {
     App(AppError),
-    Invalid(String),
+    Invalid(Invalid),
+    NotJson,
     Database(rusqlite::Error),
     Auth {
         status: u16,
