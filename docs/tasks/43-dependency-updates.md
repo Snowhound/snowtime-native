@@ -1,6 +1,6 @@
 # 081.43: Dependency updates, deno_core 0.413 and V8 150.4
 
-Status: in-progress
+Status: done (2026-10-22): the bar and the gate pass; render p95 up to 8.6% lower
 
 Move to the newest releases that can affect performance, and measure them against the
 `5a5cb9b` baseline. Checked on 2026-10-22:
@@ -37,10 +37,27 @@ polyfills and rendered too slowly ([native rendering](../architecture/native-ren
   aarch64 `539e2838…`), matching GitHub's published asset digests. The 149.4.0 entries
   stay while CI builds a base commit that locks them.
 
+## Results
+
+The performance gate (`--build-current`, then the gate with the `mac` profile against
+`5a5cb9b`) passed all 32 metrics on 2026-10-22, `app/perf/.cache/native-gate/runs/2026-10-22T12-02-32.849Z`:
+
+- Render CPU is flat to 4% lower on the four pages, and p95 0–8.6% lower.
+- Render-harness peak RSS is 228 MB against 211 (+7.6%), inside its band. 081.42's run
+  showed the same +7% with a binary the same size as the baseline's, so it doesn't come
+  from V8; look at the render harness image built since the baseline froze.
+- The binary is 81,320,128 bytes, 0.7% larger. API and load-test CPU stay in their bands.
+
+Three earlier attempts don't count. The first `--build-current` failed on a truncated
+`librusty_v8.a` in Docker's shared `/src/target` cache, and a plain retry built. Then one
+gate run was excluded for 503s from the report budget in a current round, and one failed
+reading a baseline process that had exited; two other containers were each using a full
+CPU in the Docker VM at the time.
+
 ## Acceptance criteria
 
 - [x] The bar passes (2026-10-22, the second run; the first refused the duplicate
       `aws-lc-sys`).
-- [ ] The performance gate against `5a5cb9b` on a quiet machine, with render CPU and peak
+- [x] The performance gate against `5a5cb9b` on a quiet machine, with render CPU and peak
       RSS compared with 081.42's run (`2026-10-22T10-20-55.436Z`).
 - [ ] CI passes, including the image build with the new V8 archive.

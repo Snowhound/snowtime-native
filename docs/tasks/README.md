@@ -323,7 +323,7 @@ which records the edge measurements.
   fork removed, since the library cut no code and alpha.5 requires system ICU
   (done)
 - [43](43-dependency-updates.md): deno_core 0.413 with V8 150.4, tokio, hyper, and aws-lc-rs,
-  measured with the performance gate (in-progress)
+  measured with the performance gate (done)
 
 Task 084 moved the TypeScript app from server functions to the same API, through one
 client module. Task 089 replaces that module's call table with routes and client functions
