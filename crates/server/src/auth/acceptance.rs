@@ -205,7 +205,7 @@ impl App {
             return response;
         }
         if let Err(response) =
-            super::callback_urls::check_urls(&request, Some(&body), self.config.app_origin())
+            super::sign_out::check_urls(&request, Some(&body), self.config.app_origin())
         {
             return response;
         }

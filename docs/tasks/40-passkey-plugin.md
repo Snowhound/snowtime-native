@@ -1,6 +1,6 @@
 # 081.40: Passkeys through better-auth-rs
 
-Status: done (2026-10-11): passkeys stay app code; the library's plugin matched 29 of 151 steps, 44 with the clock worked around
+Status: done (2026-10-11): passkeys stay app code; the library's plugin matched 29 of 151 steps, 44 with the clock worked around. Superseded 2026-10-22 by 081.42, which removes better-auth-rs
 
 Check whether better-auth-rs's passkey plugin can replace the app's passkey module
 (`crates/server/src/auth/passkeys.rs`, 927 lines, from 081.28). 081.39 kept the module
