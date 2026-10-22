@@ -60,4 +60,4 @@ CPU in the Docker VM at the time.
       `aws-lc-sys`).
 - [x] The performance gate against `5a5cb9b` on a quiet machine, with render CPU and peak
       RSS compared with 081.42's run (`2026-10-22T10-20-55.436Z`).
-- [ ] CI passes, including the image build with the new V8 archive.
+- [x] CI passes, including the image build with the new V8 archive (run 39775465355).
