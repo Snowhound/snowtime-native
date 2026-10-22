@@ -43,11 +43,19 @@ Perry 0.5.1520 (commit `381045a8735f`, the latest npm release, 3,337 commits beh
 - Building Perry's `main` needs LLVM 22, which Homebrew doesn't ship, so `main` wasn't
   tried.
 
-An issue for the `ArrayPush` bug, with the minimal case, is drafted for Perry's tracker.
+## Checked 2026-10-17
+
+No release since 0.5.1520. Perry's `main` (commit `7cbfde8`, 0.5.1659) built with
+Homebrew's `llvm@22` still fails on the minimal case with the same error; the `let` variant
+compiles. A local `main` build can only be checked with `--no-link`: it refuses to compile
+without a GC effects sidecar beside its runtime archives, and the sidecar script finds one
+exported symbol in them on macOS. Reported upstream as
+[PerryTS/perry#12742](https://github.com/PerryTS/perry/issues/12742), with TanStack Router's
+`getNodeMatch` as the real-world case.
 
 ## Acceptance criteria
 
-- [ ] The `ArrayPush` bug reported upstream, or found fixed
+- [x] The `ArrayPush` bug reported upstream, or found fixed
 - [ ] On the next Perry release, the render bundle compiled and measured as in task
       081.01: render p50 and p95, CPU per render, RSS at idle and peak, and byte equality
       with Bun's and V8's output
