@@ -29,3 +29,4 @@ and client code in the bundle (the weather shaders, the client's error handling)
 - [x] The bar passes at the new pin: the app's conformance suite, including task 095's
       Estonian-session test, and the byte comparison of every call.
 - [x] README names the new pin, with 67 conformance tests and 572 assertions.
+- [x] CI passes (run 39784023049).
