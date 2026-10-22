@@ -38,6 +38,12 @@ jobs:
         with:
           bun-version-file: app/package.json
 
+      # The schema generator's differential test takes the app's verdicts from Node, the
+      # app's production runtime; js_date.rs ports Node 24's Date.parse.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
       # Installs rust-toolchain.toml's version and components.
       - name: Toolchain
         run: rustup toolchain install

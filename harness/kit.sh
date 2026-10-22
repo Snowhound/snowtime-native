@@ -8,7 +8,7 @@ if [ -n "${PORTING_KIT:-}" ]; then
   echo "$PORTING_KIT"
   exit
 fi
-kit_revision=2024eb866c608f5f7204e5d616fea09510727fda
+kit_revision=7e8e86cbb69ab43678e383d06d9e7b22c59585d1
 kit=${TMPDIR:-/tmp}/porting-kit-$kit_revision
 if [ ! -d "$kit" ]; then
   git clone -q https://github.com/kaitk/porting-kit "$kit"

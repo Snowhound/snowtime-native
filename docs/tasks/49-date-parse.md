@@ -18,7 +18,9 @@ without a zone as UTC, where Node reads local time.
   `mktime`. Node takes the offset from before a DST change for a time the change skips or
   repeats; `mktime` follows the platform. That matters only outside UTC, and production
   runs in UTC.
-- `schema-gen.json` has no exclusions; the differential test compares 16,763 inputs.
+- `schema-gen.json` has no exclusions; the differential test compares 16,763 inputs, with
+  the app's verdicts from Node, the app's production runtime, rather than Bun (kit
+  `7e8e86c`). CI installs Node 24, whose `Date.parse` `js_date.rs` ports.
 - `harness/kit.sh` takes `PORTING_KIT`, a kit checkout to use instead of the pinned clone
   while the kit changes beside the port.
 
