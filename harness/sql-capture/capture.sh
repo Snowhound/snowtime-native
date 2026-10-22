@@ -1,10 +1,9 @@
 #!/bin/sh
 # Records the app's SQL per route while its conformance suite runs, with the porting kit's
-# sql-capture tool at the revision harness/kit.sh names (PORTING_KIT overrides it with a
-# checkout). Applies app.patch and the kit's libsql adapter in app/ for the run, reverts
+# sql-capture tool at the revision harness/kit.sh names. Applies app.patch and the kit's libsql adapter in app/ for the run, reverts
 # both, and writes each route's SQL to sql/. The capture stays in temp/sql-capture/.
 set -eu
-kit=${PORTING_KIT:-$("$(dirname "$0")/../kit.sh")}
+kit=$("$(dirname "$0")/../kit.sh")
 cd "$(dirname "$0")/../.."
 root=$(pwd)
 if ! git -C app diff --quiet; then

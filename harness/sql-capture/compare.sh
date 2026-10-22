@@ -1,10 +1,10 @@
 #!/bin/sh
 # Records the port's SQL per request while the conformance suite runs against it, built with
 # the sql-capture feature, and compares it per route with the app's capture from capture.sh,
-# using the porting kit's sql-capture tool at the revision harness/kit.sh names
-# (PORTING_KIT overrides it with a checkout). Writes temp/sql-capture/compare.md.
+# using the porting kit's sql-capture tool at the revision harness/kit.sh names. Writes
+# temp/sql-capture/compare.md.
 set -eu
-kit=${PORTING_KIT:-$("$(dirname "$0")/../kit.sh")}
+kit=$("$(dirname "$0")/../kit.sh")
 cd "$(dirname "$0")/../.."
 out=temp/sql-capture
 if [ ! -s "$out/app.jsonl" ]; then

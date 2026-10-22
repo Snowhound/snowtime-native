@@ -340,6 +340,8 @@ One line each. A finished subtask's record is in git history: its link points at
 - [48](48-sql-capture.md): the app's SQL per route from its conformance suite, the port's
   the same way, and a comparison per route with the kit's SQL capture; three port
   findings fixed (in progress)
+- [49](49-date-parse.md): dates read as Node's `Date.parse` reads them, with the kit's port of
+  V8's parser; the differential test's date exclusion is gone (done)
 
 Task 084 moved the TypeScript app from server functions to the same API, through one
 client module. Task 089 replaces that module's call table with routes and client functions

@@ -56,91 +56,30 @@ impl Timestamp {
         )
     }
 
-    /// The ISO 8601 forms `new Date(string)` reads: a date, or a date and time with
-    /// optional seconds and fraction and a `Z` or `±hh:mm` offset. A time without an offset
-    /// is read as UTC, where `Date` would read local time.
+    /// The time `new Date(text)` gives in the app's process, for the dates its transport
+    /// revives: V8's `Date.parse` (the generated `inputs::js_date`, task 081.49), its legacy
+    /// forms included, with times without a zone read in this process's time zone.
     pub fn parse(text: &str) -> Option<Timestamp> {
-        // V8 accepts short numeric strings as a local month (1–12) or a year.
-        // GET query values are strings even when the client input was numeric.
-        if !text.is_empty() && text.len() < 4 && text.bytes().all(|b| b.is_ascii_digit()) {
-            let n: i32 = text.parse().ok()?;
-            let (year, month) = match n {
-                0 => (2000, 1),
-                1..=12 => (2001, n),
-                13..=31 => return None,
-                32..=49 => (2000 + n, 1),
-                50..=99 => (1900 + n, 1),
-                _ => (n, 1),
-            };
-            // SAFETY: tm is a C record whose fields are all valid when zeroed.
-            let mut date: libc::tm = unsafe { std::mem::zeroed() };
-            date.tm_year = year - 1900;
-            date.tm_mon = month - 1;
-            date.tm_mday = 1;
-            date.tm_isdst = -1;
-            // SAFETY: mktime borrows the record for this call only.
-            let seconds = unsafe { libc::mktime(&mut date) };
-            return Some(Timestamp(seconds as i64 * 1000));
-        }
-        let b = text.as_bytes();
-        let digits = |from: usize, len: usize| -> Option<i64> {
-            let part = b.get(from..from + len)?;
-            part.iter()
-                .all(u8::is_ascii_digit)
-                .then(|| part.iter().fold(0i64, |n, d| n * 10 + i64::from(d - b'0')))
-        };
-        let year = digits(0, 4)?;
-        if b.get(4) != Some(&b'-') || b.get(7) != Some(&b'-') {
-            return None;
-        }
-        let (month, day) = (digits(5, 2)?, digits(8, 2)?);
-        if !(1..=12).contains(&month) || day < 1 || day > days_in_month(year, month) {
-            return None;
-        }
-        let mut ms = days_from_civil(year, month, day) * DAY_MS;
-        if b.len() == 10 {
-            return Some(Timestamp(ms));
-        }
-        if b.get(10) != Some(&b'T') || b.get(13) != Some(&b':') {
-            return None;
-        }
-        let (hour, minute) = (digits(11, 2)?, digits(14, 2)?);
-        let mut i = 16;
-        let mut second = 0;
-        if b.get(i) == Some(&b':') {
-            second = digits(i + 1, 2)?;
-            i += 3;
-            if b.get(i) == Some(&b'.') {
-                let start = i + 1;
-                let mut end = start;
-                while end < b.len() && b[end].is_ascii_digit() {
-                    end += 1;
-                }
-                if end == start {
-                    return None;
-                }
-                // Milliseconds; further digits are dropped, as V8 drops them.
-                let frac = &b[start..end.min(start + 3)];
-                let value = frac.iter().fold(0i64, |n, d| n * 10 + i64::from(d - b'0'));
-                ms += value * 10i64.pow(3 - frac.len() as u32);
-                i = end;
-            }
-        }
-        if hour > 24 || minute > 59 || second > 59 || (hour == 24 && minute + second > 0) {
-            return None;
-        }
-        ms += hour * 3_600_000 + minute * 60_000 + second * 1000;
-        match b.get(i) {
-            None => {}
-            Some(b'Z') if i + 1 == b.len() => {}
-            Some(&sign @ (b'+' | b'-')) if b.len() == i + 6 && b[i + 3] == b':' => {
-                let offset = digits(i + 1, 2)? * 3_600_000 + digits(i + 4, 2)? * 60_000;
-                ms += if sign == b'+' { -offset } else { offset };
-            }
-            _ => return None,
-        }
-        Some(Timestamp(ms))
+        crate::inputs::js_date::date_parse(text, local_to_utc).map(Timestamp)
     }
+}
+
+// A local time, as milliseconds since 1970 read in this process's time zone, in UTC.
+// Node takes the offset from before a DST change for a time the change skips or repeats;
+// mktime picks by the platform's rules, which matter only outside UTC.
+fn local_to_utc(local: i64) -> i64 {
+    let seconds = local.div_euclid(1000) as libc::time_t;
+    // SAFETY: tm is a C record whose fields are all valid when zeroed.
+    let mut fields: libc::tm = unsafe { std::mem::zeroed() };
+    // SAFETY: gmtime_r and mktime borrow the values for the call only.
+    let utc = unsafe {
+        if libc::gmtime_r(&seconds, &mut fields).is_null() {
+            return local;
+        }
+        fields.tm_isdst = -1;
+        libc::mktime(&mut fields)
+    };
+    utc as i64 * 1000 + local.rem_euclid(1000)
 }
 
 impl Serialize for Timestamp {
@@ -202,7 +141,17 @@ mod tests {
                 .to_iso(),
             "2026-09-30T07:30:00.123Z"
         );
-        assert!(Timestamp::parse("2026-02-30T00:00:00Z").is_none());
+        // Date rolls February 30 over, and reads the legacy forms.
+        assert_eq!(
+            Timestamp::parse("2026-02-30T00:00:00Z").unwrap().to_iso(),
+            "2026-03-02T00:00:00.000Z"
+        );
+        assert_eq!(
+            Timestamp::parse("Oct 22 2026 10:00 GMT+2")
+                .unwrap()
+                .to_iso(),
+            "2026-10-22T08:00:00.000Z"
+        );
         assert!(Timestamp::parse("yesterday").is_none());
     }
 }

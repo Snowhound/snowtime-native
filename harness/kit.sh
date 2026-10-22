@@ -1,9 +1,14 @@
 #!/bin/sh
 # Prints a checkout of the porting kit at the revision this port uses, cloning it once.
-# The kit's tools (schema-gen, route-parity, sql-capture) run from it; moving the revision is a port
-# change like any other dependency update.
+# The kit's tools (schema-gen, route-parity, sql-capture) run from it; moving the revision
+# is a port change like any other dependency update.
 set -eu
-kit_revision=f5de0e699ae575d001c61717d8daed5b3e074077
+# PORTING_KIT names a checkout to use instead, while changing the kit beside the port.
+if [ -n "${PORTING_KIT:-}" ]; then
+  echo "$PORTING_KIT"
+  exit
+fi
+kit_revision=2024eb866c608f5f7204e5d616fea09510727fda
 kit=${TMPDIR:-/tmp}/porting-kit-$kit_revision
 if [ ! -d "$kit" ]; then
   git clone -q https://github.com/kaitk/porting-kit "$kit"

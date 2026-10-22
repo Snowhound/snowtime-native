@@ -48,19 +48,6 @@
   },
   "differential": {
     "runner": "cargo run -q -p snowtime-server --example schema-run",
-    "decode": "src/lib/api/wire.ts#decode",
-    "exclude": [
-      {
-        "values": [
-          "2026-9-24",
-          "2026-02-30",
-          "-1",
-          "1.5",
-          "ABC-123",
-          "abc-123"
-        ],
-        "reason": "dates V8's legacy parser accepts and Timestamp::parse refuses (task 45)"
-      }
-    ]
+    "decode": "src/lib/api/wire.ts#decode"
   }
 }

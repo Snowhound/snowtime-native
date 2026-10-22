@@ -242,8 +242,10 @@ the porting kit's schema generator (`schema-gen.json`, task 081.45): the same fi
 as the app, with its key, parameters, and English message. What the generator can't
 translate, such as a check across fields, is a hook in the domain's `schemas.rs`; each
 generated file lists its hooks with the app's source. `harness/schema-gen.sh` checks the
-files at the kit revision it names and compares 16,375 inputs with the app's own decoder;
-`--write` regenerates them after the pin moves.
+files at the kit revision it names and compares 16,763 inputs with the app's own decoder;
+`--write` regenerates them after the pin moves. Dates are read as the app's `new Date(text)`
+reads them on Node, V8's legacy forms included, with the kit's port of V8's `Date.parse`
+(task 081.49).
 
 ## Route coverage
 
