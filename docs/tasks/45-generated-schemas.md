@@ -1,6 +1,6 @@
 # 081.45: Generated input schemas
 
-Status: in-progress (2026-10-22)
+Status: done (2026-10-22): the bar and the differential test pass on the generated code
 
 Generate the input structs and their validation from the app's valibot schemas, with the
 porting kit's schema generator (kit task 003, `tools/schema-gen`), instead of keeping them
@@ -45,8 +45,8 @@ The first run found two differences:
   `2026-02-30` (rolled over to 2 March), `Sep 24 2026`, `2026/09/24`, and `ABC-123`;
   `Timestamp::parse` refuses them. The hand-written port refused them too, and the app's
   client sends ISO strings, but an API key's client may not. Left out of the test with that
-  reason in `schema-gen.json` until the maintainer decides: refuse them, as now, and
-  record the difference, or accept V8's forms.
+  reason in `schema-gen.json`. Many apps revive dates this way, so the kit's runtime will
+  match the engine (kit task 003).
 
 ## Acceptance criteria
 
@@ -56,5 +56,8 @@ The first run found two differences:
       recorded.
 - [x] The bar passes at `40d9d35`: all 67 conformance tests (572 assertions, 13 files),
       all 1,490 calls byte for byte, and the 17 hardening checks.
-- [ ] The maintainer decides on V8's legacy date forms.
-- [ ] CI checks that the generated files are current, once the kit is fetched by revision.
+- [x] The maintainer decides on V8's legacy date forms (2026-10-22): the kit's runtime gets
+      a port of V8's `Date.parse` (kit task 003); until then the port refuses them, as
+      before, with the exclusion recorded in `schema-gen.json`.
+- [x] CI checks that the generated files are current at the kit revision
+      `harness/schema-gen.sh` names, and runs the differential test.

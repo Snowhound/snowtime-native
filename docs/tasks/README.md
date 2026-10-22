@@ -326,6 +326,9 @@ which records the edge measurements.
   measured with the performance gate (done)
 - [44](44-validation-keys.md): validation failures answer a key, its parameters, and an English
   message, after snowtime task 095; the pin moves to `40d9d35` (done)
+- [45](45-generated-schemas.md): input structs and validation generated from the app's
+  valibot schemas with the kit's schema generator, replacing the hand-written tables
+  (done)
 
 Task 084 moved the TypeScript app from server functions to the same API, through one
 client module. Task 089 replaces that module's call table with routes and client functions
