@@ -1,38 +1,6 @@
 use crate::entries::schemas::Entry;
+pub use crate::inputs::timer::*;
 use crate::schemas::*;
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StartTimerInput {
-    pub id: String,
-    #[serde(default)]
-    pub description: String,
-    #[serde(default)]
-    pub ticket: Option<String>,
-    #[serde(default)]
-    pub project_id: Option<String>,
-}
-
-impl Validate for StartTimerInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[
-        ("id", Field::RequiredId),
-        ("description", Field::Description),
-        ("ticket", Field::Ticket),
-        ("projectId", Field::NullableId),
-    ];
-    fn validate(&mut self) -> Result<()> {
-        trim(&mut self.description);
-        Ok(())
-    }
-}
-
-#[derive(Deserialize)]
-pub struct StopTimerInput {
-    pub id: String,
-}
-
-impl Validate for StopTimerInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[("id", Field::RequiredId)];
-}
 
 #[derive(Serialize)]
 pub struct RunningTimerProject {

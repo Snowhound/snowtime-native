@@ -1,8 +1,36 @@
 use crate::calendar::{WeekStart, Zone};
+pub use crate::inputs::reports::*;
 use crate::schemas::*;
 
 // Longest range a report covers: a year of weeks.
 pub const MAX_REPORT_DAYS: i64 = 371;
+// Longest piece of an export: a calendar month.
+const MAX_EXPORT_PIECE_DAYS: i64 = 31;
+
+// Hooks of the generated validators (crate::inputs::reports). IsoDate's form is checked
+// first, so a day that doesn't parse is one the month lacks.
+pub(crate) fn date_unknown(text: &str) -> bool {
+    Day::parse(text).is_some()
+}
+pub(crate) fn report_input_range_end_before_start(input: &ReportInput) -> bool {
+    input.to > input.from
+}
+pub(crate) fn report_input_range_too_long(input: &ReportInput) -> bool {
+    input.to.0 - input.from.0 <= MAX_REPORT_DAYS
+}
+pub(crate) fn member_or_team(input: &ReportInput) -> bool {
+    !(input.user_id.is_some() && input.team_id.is_some())
+}
+pub(crate) fn report_export_input_range_end_before_start(input: &ReportExportInput) -> bool {
+    input.to > input.from
+}
+// The piece lies inside the report's range.
+pub(crate) fn report_export_input_check(input: &ReportExportInput) -> bool {
+    input.from >= input.report.from && input.to <= input.report.to
+}
+pub(crate) fn report_export_input_range_too_long(input: &ReportExportInput) -> bool {
+    input.to.0 - input.from.0 <= MAX_EXPORT_PIECE_DAYS
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -10,54 +38,6 @@ pub enum Unit {
     #[default]
     Day,
     Week,
-}
-
-// Totals for the days from `from` up to but not including `to`, per day or per week,
-// optionally of one member or of one team's current members, and of one project ('none' is
-// time without a project). Totals per ticket come only with `tickets`.
-#[derive(Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ReportInput {
-    pub from: Day,
-    pub to: Day,
-    #[serde(default)]
-    pub unit: Unit,
-    #[serde(default)]
-    pub user_id: Option<String>,
-    #[serde(default)]
-    pub team_id: Option<String>,
-    #[serde(default)]
-    pub project_id: Option<String>,
-    #[serde(default)]
-    pub tickets: Option<bool>,
-}
-
-impl Validate for ReportInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[
-        ("from", Field::RequiredDay),
-        ("to", Field::RequiredDay),
-        ("unit", Field::Picklist(&["day", "week"])),
-        ("userId", Field::Id),
-        ("teamId", Field::Id),
-        ("projectId", Field::IdOrNone),
-        ("tickets", Field::True),
-    ];
-    fn validate(&mut self) -> Result<()> {
-        if self.to <= self.from {
-            return refuse_input("validation_range_end_before_start");
-        }
-        if self.to.0 - self.from.0 > MAX_REPORT_DAYS {
-            return refuse_input_with(
-                "validation_range_too_long",
-                "days",
-                Param::Number(MAX_REPORT_DAYS),
-            );
-        }
-        if self.user_id.is_some() && self.team_id.is_some() {
-            return refuse_input("validation_member_or_team");
-        }
-        Ok(())
-    }
 }
 
 #[derive(Clone, Serialize)]
@@ -131,10 +111,6 @@ pub struct Report {
 pub const ENTRY_PAGE_SIZE: usize = 100;
 pub const DESCRIPTION_PAGE_SIZE: usize = 25;
 
-fn nested<T: serde::de::DeserializeOwned + Validate>(value: serde_json::Value) -> Result<()> {
-    decode::<T>(value).map(|_| ())
-}
-
 #[derive(Clone, Deserialize)]
 pub struct EntryRow {
     pub group: String,
@@ -149,127 +125,6 @@ pub struct DayCursor {
     pub from: f64,
     pub entry_id: String,
 }
-impl Validate for DayCursor {
-    const FIELDS: &'static [(&'static str, Field)] = &[
-        ("date", Field::RequiredDay),
-        ("userId", Field::RequiredId),
-        ("from", Field::RequiredNumber),
-        ("entryId", Field::RequiredId),
-    ];
-}
-
-#[derive(Deserialize)]
-pub struct ReportEntriesInput {
-    pub report: ReportInput,
-    pub view: String,
-    pub row: Option<EntryRow>,
-    pub after: Option<DayCursor>,
-    pub offset: Option<f64>,
-}
-impl Validate for ReportEntriesInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[
-        (
-            "report",
-            Field::Object {
-                required: true,
-                check: nested::<ReportInput>,
-            },
-        ),
-        ("view", Field::RequiredPicklist(&["day", "description"])),
-        (
-            "row",
-            Field::Object {
-                required: false,
-                check: check_row,
-            },
-        ),
-        (
-            "after",
-            Field::Object {
-                required: false,
-                check: nested::<DayCursor>,
-            },
-        ),
-        ("offset", Field::Offset),
-    ];
-}
-
-// Validate the variant's id before deserialization, including absent and null ids.
-fn check_row(value: serde_json::Value) -> Result<()> {
-    crate::schemas::check_field(
-        "group",
-        Field::Discriminator(&["project", "team", "member", "ticket"]),
-        value.get("group"),
-    )?;
-    let field = match value["group"].as_str() {
-        Some("member") => Field::RequiredId,
-        Some("ticket") => Field::TicketOrNone,
-        _ => Field::IdOrNone,
-    };
-    if value.get("id").is_none() {
-        return invalid("Invalid key: Expected \"id\" but received undefined");
-    }
-    crate::schemas::check_field("id", field, value.get("id"))
-}
-
-#[derive(Deserialize)]
-pub struct ReportEntryTotalsInput {
-    pub report: ReportInput,
-    pub row: Option<EntryRow>,
-}
-impl Validate for ReportEntryTotalsInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[
-        (
-            "report",
-            Field::Object {
-                required: true,
-                check: nested::<ReportInput>,
-            },
-        ),
-        (
-            "row",
-            Field::Object {
-                required: false,
-                check: check_row,
-            },
-        ),
-    ];
-}
-
-#[derive(Deserialize)]
-pub struct ReportExportInput {
-    pub report: ReportInput,
-    pub from: Day,
-    pub to: Day,
-    pub now: Option<Timestamp>,
-}
-impl Validate for ReportExportInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[
-        (
-            "report",
-            Field::Object {
-                required: true,
-                check: nested::<ReportInput>,
-            },
-        ),
-        ("from", Field::RequiredDay),
-        ("to", Field::RequiredDay),
-        ("now", Field::Date),
-    ];
-    fn validate(&mut self) -> Result<()> {
-        if self.to <= self.from {
-            return refuse_input("validation_range_end_before_start");
-        }
-        if self.from < self.report.from || self.to > self.report.to {
-            return invalid("Invalid input: Received Object");
-        }
-        if self.to.0 - self.from.0 > 31 {
-            return refuse_input_with("validation_range_too_long", "days", Param::Number(31));
-        }
-        Ok(())
-    }
-}
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectBreakdown {

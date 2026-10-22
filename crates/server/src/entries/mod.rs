@@ -116,15 +116,18 @@ pub fn create_entry(db: &Connection, scope: &Scope, input: CreateEntryInput) -> 
     if user_id != scope.user_id {
         assert_member(db, scope, user_id)?;
     }
-    if let Some(project_id) = &input.project_id {
+    // Absent and null both mean none.
+    let project_id = input.project_id.into_option();
+    let ticket = input.ticket.into_option();
+    if let Some(project_id) = &project_id {
         assert_usable_project(db, scope, project_id)?;
     }
     assert_entry_room(db, &scope.organization_id, user_id, input.started_at, None)?;
 
     let inserted = crate::sql!(
         "insert into time_entry (id, organization_id, user_id, project_id, description, ticket, started_at, stopped_at, created_by, updated_by) values (",
-        input.id, ", ", &scope.organization_id, ", ", user_id, ", ", input.project_id, ", ", input.description,
-        ", ", input.ticket, ", ", input.started_at, ", ", input.stopped_at, ", ", &scope.user_id, ", ", &scope.user_id,
+        input.id, ", ", &scope.organization_id, ", ", user_id, ", ", project_id, ", ", input.description,
+        ", ", ticket, ", ", input.started_at, ", ", input.stopped_at, ", ", &scope.user_id, ", ", &scope.user_id,
         ") returning ", entry_columns()).query_row(db, entry_of);
     match inserted {
         Ok(entry) => Ok(entry),
@@ -143,15 +146,11 @@ pub fn update_entry(db: &Connection, scope: &Scope, input: UpdateEntryInput) -> 
     let entry = find_entry(db, scope, &input.id)?;
     assert_can_write(scope, &entry.user_id)?;
 
-    if input.stopped_at.value().is_some() && entry.stopped_at.is_none() {
+    if input.stopped_at.is_some() && entry.stopped_at.is_none() {
         return refuse(Code::Invalid, Key::EntryRunning);
     }
-    let started_at = input
-        .started_at
-        .value()
-        .copied()
-        .unwrap_or(entry.started_at);
-    let stopped_at = input.stopped_at.value().copied().or(entry.stopped_at);
+    let started_at = input.started_at.unwrap_or(entry.started_at);
+    let stopped_at = input.stopped_at.or(entry.stopped_at);
     if let Some(stopped_at) = stopped_at {
         if stopped_at <= started_at {
             return refuse(Code::Invalid, Key::EntryEndBeforeStart);
@@ -166,7 +165,7 @@ pub fn update_entry(db: &Connection, scope: &Scope, input: UpdateEntryInput) -> 
     {
         assert_usable_project(db, scope, project_id)?;
     }
-    if let Some(&new_start) = input.started_at.value()
+    if let Some(new_start) = input.started_at
         && new_start != entry.started_at
     {
         assert_entry_room(
@@ -183,10 +182,10 @@ pub fn update_entry(db: &Connection, scope: &Scope, input: UpdateEntryInput) -> 
     // time_entry_max_length, time_entry_live_project).
     let mut assignments = Assignments::default();
     assignments.set("project_id", input.project_id);
-    assignments.set("description", input.description);
+    assignments.set_optional("description", input.description);
     assignments.set("ticket", input.ticket);
-    assignments.set("started_at", input.started_at);
-    assignments.set("stopped_at", input.stopped_at);
+    assignments.set_optional("started_at", input.started_at);
+    assignments.set_optional("stopped_at", input.stopped_at);
     assignments.set("updated_at", Patch::Value(clock::now()));
     assignments.set("updated_by", Patch::Value(&scope.user_id));
     let query = crate::sql!(

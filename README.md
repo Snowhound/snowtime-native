@@ -65,7 +65,8 @@ crates/server/src/
   timer/         mod (rules), schemas, routes
   http.rs        InOrganization, AsUser, Public, AuthCall, router
   scope.rs       tenancy
-  schemas.rs     shared validation, Empty, and Patch
+  inputs/        input structs and validation generated from the app's schemas
+  schemas.rs     decode, Empty, and Patch
   queries.rs     shared SQL helpers
   calendar.rs · holidays.rs · fill.rs   src/lib/calendar.ts, holidays/, taglines/fill.ts
   errors.rs · wire.rs · timestamp.rs · clock.rs · rate_limit.rs · timing.rs · config.rs
@@ -233,6 +234,16 @@ docker run --rm --cpuset-cpus=1 -v "$PWD/harness:/bench:ro" oven/bun:1.4.2 bun
 Each command checks every hash against the Better Auth fixture, discards three warmups,
 and reports the median of at least 20 measured hashes. On macOS, vendored OpenSSL needs
 Perl and make. The optional Docker stage installs those and `linux-perf` for profiling.
+
+## Input validation
+
+The input structs and their validation are generated from the app's valibot schemas by
+the porting kit's schema generator (`schema-gen.json`, task 081.45): the same first issue
+as the app, with its key, parameters, and English message. What the generator can't
+translate, such as a check across fields, is a hook in the domain's `schemas.rs`; each
+generated file lists its hooks with the app's source. `harness/schema-gen.sh` checks the
+files at the kit revision it names and compares 16,375 inputs with the app's own decoder;
+`--write` regenerates them after the pin moves.
 
 ## Run it
 

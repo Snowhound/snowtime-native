@@ -1,4 +1,5 @@
 use crate::calendar::{WeekStart, Zone};
+pub use crate::inputs::settings::*;
 use crate::schemas::*;
 
 pub const COLLECTIONS: &[&str] = &["mountains", "countryside", "coast"];
@@ -32,29 +33,16 @@ pub const IMAGES: &[&str] = &[
     "coast-november",
     "coast-december",
 ];
-const LOCALES: &[&str] = &["en", "et"];
 
-fn time_zone(name: &str) -> Result<()> {
-    let valid = name.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
-        && name.split('/').all(|part| {
-            !part.is_empty()
-                && part
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b"_+-".contains(&b))
-        });
-    if !valid {
-        return refuse_input("validation_time_zone_format");
-    }
-    // ICU rejects tzdb's placeholder Factory zone, which jiff can read.
-    if name.eq_ignore_ascii_case("Factory") || Zone::get(name).is_none() {
-        return refuse_input("validation_time_zone_unknown");
-    }
-    Ok(())
+// Hooks of the generated validators (crate::inputs::settings). ICU rejects tzdb's
+// placeholder Factory zone, which jiff can read.
+pub(crate) fn time_zone_unknown(name: &str) -> bool {
+    !name.eq_ignore_ascii_case("Factory") && Zone::get(name).is_some()
 }
 
 // validDurationPattern (src/lib/duration-pattern-settings.ts): at most 40 UTF-16 units, with
 // H, M, or S outside a backslash escape.
-fn copy_duration_pattern(pattern: &str) -> Result<()> {
+pub(crate) fn copy_duration_pattern(pattern: &str) -> bool {
     let mut chars = pattern.chars();
     let mut field = false;
     while let Some(c) = chars.next() {
@@ -66,118 +54,7 @@ fn copy_duration_pattern(pattern: &str) -> Result<()> {
             _ => {}
         }
     }
-    if !field || pattern.encode_utf16().count() > 40 {
-        return refuse_input("validation_copy_duration_pattern");
-    }
-    Ok(())
-}
-
-fn default_locale() -> String {
-    "en".into()
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateSettingsInput {
-    pub time_zone: String,
-    #[serde(default = "default_locale")]
-    pub locale: String,
-}
-impl Validate for CreateSettingsInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[
-        (
-            "timeZone",
-            Field::CheckedString {
-                required: true,
-                check: time_zone,
-            },
-        ),
-        ("locale", Field::Picklist(LOCALES)),
-    ];
-}
-
-#[derive(Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-pub struct UpdateSettingsInput {
-    pub time_zone: Option<String>,
-    pub week_start: Option<String>,
-    pub locale: Option<String>,
-    pub theme: Option<String>,
-    pub timer_layout: Option<String>,
-    #[serde(deserialize_with = "optional_bool")]
-    pub show_summary: Option<bool>,
-    #[serde(deserialize_with = "optional_bool")]
-    pub compact_rows: Option<bool>,
-    #[serde(deserialize_with = "optional_bool")]
-    pub wide_timer: Option<bool>,
-    pub timer_view: Option<String>,
-    #[serde(deserialize_with = "optional_bool")]
-    pub calendar_weekend: Option<bool>,
-    pub app_icon: Option<String>,
-    pub scene_collection: Option<String>,
-    pub scene_pin: Patch<String>,
-    #[serde(deserialize_with = "optional_bool")]
-    pub scene_background: Option<bool>,
-    pub scene_strength: Option<String>,
-    pub surfaces: Option<String>,
-    #[serde(deserialize_with = "optional_bool")]
-    pub scene_weather: Option<bool>,
-    #[serde(deserialize_with = "optional_bool")]
-    pub scene_intro: Option<bool>,
-    #[serde(deserialize_with = "optional_bool")]
-    pub scene_tagline: Option<bool>,
-    pub duration_format: Option<String>,
-    pub date_format: Option<String>,
-    pub time_format: Option<String>,
-    pub copy_duration_pattern: Option<String>,
-    pub copy_duration_control: Option<String>,
-    pub country: Patch<String>,
-}
-impl Validate for UpdateSettingsInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[
-        (
-            "timeZone",
-            Field::CheckedString {
-                required: false,
-                check: time_zone,
-            },
-        ),
-        ("weekStart", Field::Picklist(&["mon", "sun"])),
-        ("locale", Field::Picklist(LOCALES)),
-        ("theme", Field::Picklist(&["system", "light", "dark"])),
-        ("timerLayout", Field::Picklist(&["bar", "focus", "table"])),
-        ("showSummary", Field::Bool),
-        ("compactRows", Field::Bool),
-        ("wideTimer", Field::Bool),
-        ("timerView", Field::Picklist(&["list", "calendar"])),
-        ("calendarWeekend", Field::Bool),
-        (
-            "appIcon",
-            Field::Picklist(&[
-                "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12",
-            ]),
-        ),
-        ("sceneCollection", Field::Picklist(COLLECTIONS)),
-        ("scenePin", Field::NullablePicklist(IMAGES)),
-        ("sceneBackground", Field::Bool),
-        ("sceneStrength", Field::Picklist(&["dimmed", "full"])),
-        ("surfaces", Field::Picklist(&["glass", "solid"])),
-        ("sceneWeather", Field::Bool),
-        ("sceneIntro", Field::Bool),
-        ("sceneTagline", Field::Bool),
-        ("durationFormat", Field::Picklist(&["clock", "units"])),
-        ("dateFormat", Field::Picklist(&["dmy", "mdy"])),
-        ("timeFormat", Field::Picklist(&["24h", "12h"])),
-        (
-            "copyDurationPattern",
-            Field::CheckedString {
-                required: false,
-                check: copy_duration_pattern,
-            },
-        ),
-        ("copyDurationControl", Field::Picklist(&["text", "button"])),
-        ("country", Field::NullablePicklist(&["EE", "US", "other"])),
-    ];
+    field && pattern.encode_utf16().count() <= 40
 }
 
 #[cfg(test)]

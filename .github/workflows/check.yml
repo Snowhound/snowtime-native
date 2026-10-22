@@ -74,6 +74,11 @@ jobs:
       - name: Clippy with bench
         run: cargo clippy --locked --workspace --all-targets --features bench -- -D warnings
 
+      # The input validation generated from the app's valibot schemas is current at the
+      # kit revision it names, and answers as the app does (harness/schema-gen.sh).
+      - name: Generated input validation
+        run: harness/schema-gen.sh
+
       - name: Tests
         run: |
           cargo test --locked -p snowtime-server

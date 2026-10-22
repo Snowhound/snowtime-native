@@ -3,7 +3,7 @@ use crate::auth::SessionConfig;
 use crate::auth::api_keys::LastUse;
 use crate::auth::session::Session;
 use crate::rate_limit::{MemoryStore, WRITES_PER_USER};
-use crate::schemas::{Empty, Validate, decode};
+use crate::schemas::{Empty, Schema, decode};
 use crate::scope::{Scope, resolve_scope};
 use crate::timing::Timer;
 use crate::wire::{app_failure, failure, invalid_failure, ok};
@@ -17,7 +17,7 @@ use axum::{
     response::{IntoResponse, Response as HttpResponse},
 };
 use rusqlite::Connection;
-use serde::{Serialize, de::DeserializeOwned};
+use serde::Serialize;
 use serde_json::{Map, Value};
 use std::cell::Cell;
 use std::marker::PhantomData;
@@ -577,7 +577,7 @@ impl App {
     }
 }
 
-impl<T: DeserializeOwned + Validate + Send + 'static, const READ: bool> InOrganization<T, READ> {
+impl<T: Schema + Send + 'static, const READ: bool> InOrganization<T, READ> {
     pub async fn with_auth<O: Serialize + 'static>(
         self,
         rule: fn(&Connection, &Scope, T, &Config, &MemoryStore) -> Result<O>,
@@ -632,7 +632,7 @@ impl<T: DeserializeOwned + Validate + Send + 'static, const READ: bool> InOrgani
         .await
     }
 }
-impl<T: DeserializeOwned + Validate + Send + 'static, const READ: bool> AsUser<T, READ> {
+impl<T: Schema + Send + 'static, const READ: bool> AsUser<T, READ> {
     pub async fn with_auth<O: Serialize + 'static>(
         self,
         rule: fn(&Connection, &str, T, &Config, Option<&str>) -> Result<O>,
@@ -673,7 +673,7 @@ impl<T: DeserializeOwned + Validate + Send + 'static, const READ: bool> AsUser<T
         .await
     }
 }
-impl<T: DeserializeOwned + Validate + Send + 'static, const READ: bool> Public<T, READ> {
+impl<T: Schema + Send + 'static, const READ: bool> Public<T, READ> {
     pub async fn run<O: Serialize + 'static>(
         self,
         rule: fn(&Connection, T) -> Result<O>,

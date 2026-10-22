@@ -1,12 +1,13 @@
-//! Shared validation helpers and tri-state patches. Domain inputs and outputs live in
-//! their own schemas.rs modules.
-use serde::de::DeserializeOwned;
-pub(crate) use serde::{Deserialize, Deserializer, Serialize};
+//! Input decoding and tri-state patches. The input structs and their validators are
+//! generated from the app's valibot schemas (crate::inputs, schema-gen.json); domain
+//! outputs and the hooks the generated code calls live in their own schemas.rs modules.
 use serde_json::Value;
 
 pub(crate) use crate::calendar::Day;
 pub(crate) use crate::errors::{Error, Invalid, Param, Result};
+pub use crate::inputs::runtime::{Patch, Schema, js_whitespace};
 pub(crate) use crate::timestamp::Timestamp;
+pub(crate) use serde::{Deserialize, Serialize};
 
 // The longest an entry runs (MAX_ENTRY_HOURS).
 pub const MAX_ENTRY_HOURS: i64 = 24;
@@ -14,413 +15,32 @@ pub const MAX_ENTRY_MS: i64 = MAX_ENTRY_HOURS * 3_600_000;
 // Longest range listEntries returns.
 pub(crate) const MAX_LIST_DAYS: i64 = 93;
 
-/// An input's schema. The wire fields come first, in valibot's order and with its messages;
-/// `validate` then trims and checks the rules that span fields, once the fields pass.
-pub trait Validate {
-    const FIELDS: &'static [(&'static str, Field)] = &[];
-    fn validate(&mut self) -> Result<()> {
-        Ok(())
-    }
-}
-
-/// A JSON value, decoded and validated against the input's schema.
-pub fn decode<T: DeserializeOwned + Validate>(value: Value) -> Result<T> {
-    for &(name, field) in T::FIELDS {
-        check_field(name, field, value.get(name))?;
-    }
-    let mut input: T = match serde_json::from_value(value) {
-        Ok(input) => input,
-        Err(e) => return invalid(e.to_string()),
-    };
-    input.validate()?;
-    Ok(input)
-}
-
-/// What a wire field holds. Unless named required, a field may be absent.
-#[derive(Clone, Copy)]
-pub enum Field {
-    RequiredId,
-    Id,
-    NullableId,
-    RequiredNullableId,
-    // Uuidv7 or 'none'.
-    IdOrNone,
-    TicketOrNone,
-    Discriminator(&'static [&'static str]),
-    RequiredPicklist(&'static [&'static str]),
-    RequiredNumber,
-    Offset,
-    Object {
-        required: bool,
-        check: fn(Value) -> Result<()>,
-    },
-    Description,
-    Ticket,
-    RequiredDate,
-    Date,
-    // An ISO calendar day (IsoDate).
-    RequiredDay,
-    Bool,
-    CheckedString {
-        required: bool,
-        check: fn(&str) -> Result<()>,
-    },
-    NullableCheckedString(fn(&str) -> Result<()>),
-    NullablePicklist(&'static [&'static str]),
-    True,
-    Picklist(&'static [&'static str]),
+/// A JSON value, validated against the input's schema as the app's valibot schema does,
+/// and decoded. A refusal answers the first issue's key, parameter, and English message;
+/// valibot's own checks carry no key and answer validation_invalid.
+pub fn decode<T: Schema>(value: Value) -> Result<T> {
+    crate::inputs::runtime::parse(value).map_err(|issue| {
+        debug_assert!(issue.params.len() <= 1, "one parameter at most: {issue:?}");
+        Error::Invalid(Invalid {
+            key: issue.key.unwrap_or("validation_invalid"),
+            params: issue.params.first().map(|&(name, param)| {
+                let param = match param {
+                    crate::inputs::runtime::Param::Number(n) => Param::Number(n),
+                    crate::inputs::runtime::Param::Text(t) => Param::Text(t),
+                };
+                (name, param)
+            }),
+            message: issue.message,
+        })
+    })
 }
 
 #[derive(serde::Deserialize)]
 pub struct Empty {}
-impl Validate for Empty {}
-
-// valibot's _stringify of the received value.
-fn received(value: &Value) -> String {
-    match value {
-        Value::Object(_) => "Object".into(),
-        Value::Array(_) => "Array".into(),
-        Value::String(v) => format!("\"{v}\""),
-        _ => value.to_string(),
+impl Schema for Empty {
+    fn check(_: &mut Value, _: &mut crate::inputs::runtime::Ctx) -> bool {
+        true
     }
-}
-
-fn expected(field: Field) -> String {
-    match field {
-        Field::RequiredDate | Field::Date => "Date".into(),
-        Field::Object { .. } => "Object".into(),
-        Field::RequiredNumber | Field::Offset => "number".into(),
-        Field::TicketOrNone => "(string | \"none\")".into(),
-        Field::Bool => "boolean".into(),
-        Field::True => "true".into(),
-        Field::IdOrNone => "(string | \"none\")".into(),
-        Field::Picklist([one])
-        | Field::RequiredPicklist([one])
-        | Field::Discriminator([one])
-        | Field::NullablePicklist([one]) => {
-            format!("\"{one}\"")
-        }
-        Field::Picklist(options)
-        | Field::RequiredPicklist(options)
-        | Field::Discriminator(options) => {
-            let quoted: Vec<_> = options.iter().map(|o| format!("\"{o}\"")).collect();
-            format!("({})", quoted.join(" | "))
-        }
-        Field::NullablePicklist(options) => expected(Field::Picklist(options)),
-        _ => "string".into(),
-    }
-}
-
-pub(crate) fn check_field(name: &str, field: Field, value: Option<&Value>) -> Result<()> {
-    let Some(value) = value else {
-        if matches!(field, Field::Discriminator(_)) {
-            return invalid(format!(
-                "Invalid type: Expected {} but received undefined",
-                expected(field)
-            ));
-        }
-        if matches!(
-            field,
-            Field::RequiredId
-                | Field::RequiredNullableId
-                | Field::RequiredDate
-                | Field::RequiredDay
-                | Field::RequiredNumber
-                | Field::RequiredPicklist(_)
-                | Field::Object { required: true, .. }
-                | Field::CheckedString { required: true, .. }
-        ) {
-            return invalid(format!(
-                "Invalid key: Expected \"{name}\" but received undefined"
-            ));
-        }
-        return Ok(());
-    };
-    if let Field::Object { check, .. } = field
-        && (value.is_object() || value.is_array())
-    {
-        return check(value.clone());
-    }
-    if matches!(field, Field::RequiredNumber | Field::Offset)
-        && let Some(number) = value.as_f64()
-    {
-        if matches!(field, Field::Offset) {
-            if number.fract() != 0.0 {
-                return invalid(format!("Invalid integer: Received {number}"));
-            }
-            if number < 0.0 {
-                return invalid(format!("Invalid value: Expected >=0 but received {number}"));
-            }
-        }
-        return Ok(());
-    }
-    let text = value.as_str();
-    let typed = match (field, text) {
-        (Field::NullableId | Field::RequiredNullableId | Field::Ticket, _) if value.is_null() => {
-            return Ok(());
-        }
-        (Field::NullablePicklist(_), _) if value.is_null() => return Ok(()),
-        (Field::NullableCheckedString(_), _) if value.is_null() => return Ok(()),
-        (Field::Bool, _) => value.is_boolean() || matches!(text, Some("true" | "false")),
-        (Field::CheckedString { check, .. }, Some(text)) => return check(text),
-        (Field::NullableCheckedString(check), Some(text)) => return check(text),
-        (Field::True, _) => value == &Value::Bool(true),
-        (
-            Field::Picklist(options)
-            | Field::RequiredPicklist(options)
-            | Field::Discriminator(options)
-            | Field::NullablePicklist(options),
-            Some(text),
-        ) => options.contains(&text),
-        (Field::RequiredDate | Field::Date, Some(text)) => {
-            if Timestamp::parse(text).is_none() {
-                return invalid("Invalid type: Expected Date but received \"Invalid Date\"");
-            }
-            true
-        }
-        (
-            Field::RequiredId | Field::Id | Field::NullableId | Field::RequiredNullableId,
-            Some(id),
-        ) => return uuid_v7(id),
-        (Field::IdOrNone | Field::TicketOrNone, Some("none")) => true,
-        (Field::TicketOrNone, Some(key)) => return ticket_key(key),
-        (Field::IdOrNone, Some(id)) => return uuid_v7(id),
-        (Field::Description, Some(text)) => return description_length(text),
-        (Field::Ticket, Some(key)) => return ticket_key(key),
-        (Field::RequiredDay, Some(day)) => return iso_date(day),
-        _ => false,
-    };
-    if typed {
-        return Ok(());
-    }
-    invalid(format!(
-        "Invalid type: Expected {} but received {}",
-        expected(field),
-        received(value)
-    ))
-}
-
-/// A refusal of valibot's own checks, which carry no key of their own.
-pub(crate) fn invalid<T>(message: impl Into<String>) -> Result<T> {
-    Err(Error::Invalid(Invalid {
-        key: "validation_invalid",
-        params: None,
-        message: message.into(),
-    }))
-}
-
-/// A schema message by its key (keyed in src/server/schemas.ts), with the English text.
-pub(crate) fn refuse_input<T>(key: &'static str) -> Result<T> {
-    Err(keyed(key, None))
-}
-
-/// A keyed schema message with its one parameter, such as `max` for validation_too_long.
-pub(crate) fn refuse_input_with<T>(
-    key: &'static str,
-    name: &'static str,
-    param: Param,
-) -> Result<T> {
-    Err(keyed(key, Some((name, param))))
-}
-
-fn keyed(key: &'static str, params: Option<(&'static str, Param)>) -> Error {
-    let template = ENGLISH
-        .iter()
-        .find(|(k, _)| *k == key)
-        .map(|(_, text)| *text)
-        .unwrap_or_else(|| panic!("no English text for {key}"));
-    let message = match &params {
-        Some((name, Param::Number(n))) => template.replace(&format!("{{{name}}}"), &n.to_string()),
-        Some((name, Param::Text(t))) => template.replace(&format!("{{{name}}}"), t),
-        None => template.to_owned(),
-    };
-    Error::Invalid(Invalid {
-        key,
-        params,
-        message,
-    })
-}
-
-/// The app's English schema messages (messages/en.json), which the API answers whatever the
-/// request's locale; a test compares them with the pinned app's file.
-const ENGLISH: &[(&str, &str)] = &[
-    ("validation_color_format", "Use a color like #4E79A7."),
-    (
-        "validation_copy_duration_pattern",
-        "Use H, M, or S, in at most 40 characters.",
-    ),
-    ("validation_date_format", "Use a date such as 2026-09-24."),
-    ("validation_date_unknown", "Unknown date."),
-    ("validation_email", "Enter a valid email address."),
-    (
-        "validation_end_before_start",
-        "The end must be after the start.",
-    ),
-    (
-        "validation_entry_too_long",
-        "An entry can be at most {hours} hours long.",
-    ),
-    ("validation_invalid_id", "Invalid id."),
-    (
-        "validation_issue_links_https",
-        "Enter an https:// address, such as https://yourcompany.atlassian.net/browse/{key}.",
-    ),
-    (
-        "validation_issue_links_key",
-        "Put {key} where the ticket key goes, such as …/browse/{key}.",
-    ),
-    (
-        "validation_member_or_team",
-        "Pick a member or a team, not both.",
-    ),
-    ("validation_name_required", "Enter a name."),
-    (
-        "validation_range_end_before_start",
-        "The range must end after it starts.",
-    ),
-    (
-        "validation_range_too_long",
-        "The range can span at most {days} days.",
-    ),
-    (
-        "validation_ticket_format",
-        "Use a ticket key such as ABC-123.",
-    ),
-    (
-        "validation_time_zone_format",
-        "Use a time zone such as Europe/Tallinn.",
-    ),
-    ("validation_time_zone_unknown", "Unknown time zone."),
-    ("validation_too_long", "Use at most {max} characters."),
-];
-
-/// A field that may be absent, null, or set: an update changes only the fields present,
-/// and null removes a value.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub enum Patch<T> {
-    #[default]
-    Absent,
-    Null,
-    Value(T),
-}
-
-impl<T> Patch<T> {
-    pub fn value(&self) -> Option<&T> {
-        match self {
-            Patch::Value(v) => Some(v),
-            _ => None,
-        }
-    }
-}
-
-impl<'de, T: Deserialize<'de>> Deserialize<'de> for Patch<T> {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
-        Option::<T>::deserialize(deserializer).map(|v| v.map_or(Patch::Null, Patch::Value))
-    }
-}
-
-// Uuidv7: app-owned rows get their id on the client.
-fn uuid_v7(id: &str) -> Result<()> {
-    let b = id.as_bytes();
-    let hex = |range: std::ops::Range<usize>| b[range].iter().all(u8::is_ascii_hexdigit);
-    let valid = b.len() == 36
-        && [8, 13, 18, 23].iter().all(|&i| b[i] == b'-')
-        && hex(0..8)
-        && hex(9..13)
-        && b[14] == b'7'
-        && hex(15..18)
-        && matches!(b[19].to_ascii_lowercase(), b'8' | b'9' | b'a' | b'b')
-        && hex(20..23)
-        && hex(24..36);
-    if valid {
-        Ok(())
-    } else {
-        refuse_input("validation_invalid_id")
-    }
-}
-
-// Description: trimmed, at most 500 characters as JavaScript counts them.
-fn trimmed(text: &str) -> &str {
-    text.trim_matches(js_whitespace)
-}
-pub(crate) fn js_whitespace(c: char) -> bool {
-    matches!(c, '\u{0009}'..='\u{000d}' | ' ' | '\u{00a0}' | '\u{1680}' | '\u{2000}'..='\u{200a}' | '\u{2028}' | '\u{2029}' | '\u{202f}' | '\u{205f}' | '\u{3000}' | '\u{feff}')
-}
-fn description_length(text: &str) -> Result<()> {
-    if trimmed(text).encode_utf16().count() > 500 {
-        return refuse_input_with("validation_too_long", "max", Param::Number(500));
-    }
-    Ok(())
-}
-pub(crate) fn name(text: &str) -> Result<()> {
-    let mut text = text.to_owned();
-    trim(&mut text);
-    if text.is_empty() {
-        return refuse_input("validation_name_required");
-    }
-    if text.encode_utf16().count() > 100 {
-        return refuse_input_with("validation_too_long", "max", Param::Number(100));
-    }
-    Ok(())
-}
-
-pub(crate) fn trim(text: &mut String) {
-    let trimmed = trimmed(text);
-    if trimmed.len() != text.len() {
-        *text = trimmed.to_owned();
-    }
-}
-
-// IsoDate: the form valibot's isoDate checks, then a day the month has.
-fn iso_date(text: &str) -> Result<()> {
-    if !Day::is_iso_form(text) {
-        return refuse_input("validation_date_format");
-    }
-    if Day::parse(text).is_none() {
-        return refuse_input("validation_date_unknown");
-    }
-    Ok(())
-}
-
-// TicketKey: a key as Jira, Linear, and YouTrack write them (TICKET_PATTERN in
-// src/lib/tickets.ts).
-fn ticket_key(key: &str) -> Result<()> {
-    let b = key.as_bytes();
-    let dash = b.iter().position(|&c| c == b'-');
-    let valid = dash.is_some_and(|dash| {
-        let (prefix, number) = (&b[..dash], &b[dash + 1..]);
-        (2..=10).contains(&prefix.len())
-            && prefix[0].is_ascii_uppercase()
-            && prefix[1..]
-                .iter()
-                .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
-            && (1..=7).contains(&number.len())
-            && (b'1'..=b'9').contains(&number[0])
-            && number.iter().all(u8::is_ascii_digit)
-    });
-    if valid {
-        Ok(())
-    } else {
-        refuse_input("validation_ticket_format")
-    }
-}
-
-// A boolean, which a GET's query string carries as "true" or "false" (revive in
-// src/lib/api/wire.ts). The field pass has refused anything else.
-pub(crate) fn query_bool<'de, D: Deserializer<'de>>(
-    deserializer: D,
-) -> std::result::Result<bool, D::Error> {
-    match Value::deserialize(deserializer)? {
-        Value::Bool(value) => Ok(value),
-        Value::String(text) => Ok(text == "true"),
-        _ => Err(serde::de::Error::custom("Expected a boolean")),
-    }
-}
-
-pub(crate) fn optional_bool<'de, D: Deserializer<'de>>(
-    deserializer: D,
-) -> std::result::Result<Option<bool>, D::Error> {
-    query_bool(deserializer).map(Some)
 }
 
 #[cfg(test)]
@@ -438,45 +58,43 @@ mod tests {
         String::from_utf8(crate::wire::invalid_failure(invalid).body).unwrap()
     }
 
+    fn refusal<T: Schema>(input: Value) -> String {
+        body(decode::<T>(input).err().expect("a refusal"))
+    }
+
     // validationRefusal in the app's src/server/http.server.ts (task 095).
     #[test]
     fn refusals_answer_key_params_and_english_message_in_order() {
-        let too_long = refuse_input_with::<()>("validation_too_long", "max", Param::Number(500));
+        let id = "0192f3a4-5b6c-7d8e-9f01-23456789abcd";
         assert_eq!(
-            body(too_long.unwrap_err()),
+            refusal::<StartTimerInput>(json!({ "id": id, "description": "x".repeat(501) })),
             r#"{"error":{"key":"validation_too_long","params":{"max":500},"message":"Use at most 500 characters."}}"#
         );
         assert_eq!(
-            body(refuse_input::<()>("validation_invalid_id").unwrap_err()),
+            refusal::<StopTimerInput>(json!({ "id": "not-a-uuid" })),
             r#"{"error":{"key":"validation_invalid_id","message":"Invalid id."}}"#
         );
         assert_eq!(
-            body(invalid::<()>("Invalid input: Received Object").unwrap_err()),
-            r#"{"error":{"key":"validation_invalid","message":"Invalid input: Received Object"}}"#
+            refusal::<StopTimerInput>(json!({})),
+            r#"{"error":{"key":"validation_invalid","message":"Invalid key: Expected \"id\" but received undefined"}}"#
         );
-    }
-
-    #[test]
-    fn english_messages_match_the_pinned_app() {
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../app/messages/en.json");
-        let app: serde_json::Map<String, Value> =
-            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
-        for (key, text) in ENGLISH {
-            assert_eq!(app.get(*key).and_then(Value::as_str), Some(*text), "{key}");
-        }
     }
 
     #[test]
     fn checks_ids_and_tickets() {
-        assert!(uuid_v7("0192f3a4-5b6c-7d8e-9f01-23456789abcd").is_ok());
-        assert!(uuid_v7("0192F3A4-5B6C-7D8E-BF01-23456789ABCD").is_ok());
-        assert!(uuid_v7("0192f3a4-5b6c-4d8e-9f01-23456789abcd").is_err());
-        assert!(uuid_v7("not-a-uuid").is_err());
-        assert!(ticket_key("LUM-12").is_ok());
-        assert!(ticket_key("A1B2C3D4E5-1234567").is_ok());
-        assert!(ticket_key("L-12").is_err());
-        assert!(ticket_key("LUM-012").is_err());
-        assert!(ticket_key("lum-12").is_err());
+        let stop = |id: &str| decode::<StopTimerInput>(json!({ "id": id })).is_ok();
+        assert!(stop("0192f3a4-5b6c-7d8e-9f01-23456789abcd"));
+        assert!(stop("0192F3A4-5B6C-7D8E-BF01-23456789ABCD"));
+        assert!(!stop("0192f3a4-5b6c-4d8e-9f01-23456789abcd"));
+        assert!(!stop("not-a-uuid"));
+        let id = "0192f3a4-5b6c-7d8e-9f01-23456789abcd";
+        let ticket =
+            |key: &str| decode::<StartTimerInput>(json!({ "id": id, "ticket": key })).is_ok();
+        assert!(ticket("LUM-12"));
+        assert!(ticket("A1B2C3D4E5-1234567"));
+        assert!(!ticket("L-12"));
+        assert!(!ticket("LUM-012"));
+        assert!(!ticket("lum-12"));
     }
 
     #[test]
@@ -488,7 +106,7 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(input.description, "Planning");
-        assert_eq!(input.ticket, None);
+        assert_eq!(input.ticket, Patch::Absent);
         let update: UpdateEntryInput = decode(json!({
             "id": "0192f3a4-5b6c-7d8e-9f01-23456789abcd",
             "projectId": null,

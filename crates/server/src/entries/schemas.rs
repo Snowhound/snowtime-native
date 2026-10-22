@@ -1,126 +1,18 @@
+pub use crate::inputs::entries::*;
 use crate::schemas::*;
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateEntryInput {
-    pub id: String,
-    #[serde(default)]
-    pub user_id: Option<String>,
-    #[serde(default)]
-    pub project_id: Option<String>,
-    #[serde(default)]
-    pub description: String,
-    #[serde(default)]
-    pub ticket: Option<String>,
-    pub started_at: Timestamp,
-    pub stopped_at: Timestamp,
-}
 
-impl Validate for CreateEntryInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[
-        ("id", Field::RequiredId),
-        ("userId", Field::Id),
-        ("projectId", Field::NullableId),
-        ("description", Field::Description),
-        ("ticket", Field::Ticket),
-        ("startedAt", Field::RequiredDate),
-        ("stoppedAt", Field::RequiredDate),
-    ];
-    fn validate(&mut self) -> Result<()> {
-        trim(&mut self.description);
-        if self.stopped_at <= self.started_at {
-            return refuse_input("validation_end_before_start");
-        }
-        if self.stopped_at.0 - self.started_at.0 > MAX_ENTRY_MS {
-            return refuse_input_with(
-                "validation_entry_too_long",
-                "hours",
-                Param::Number(MAX_ENTRY_HOURS),
-            );
-        }
-        Ok(())
-    }
+// Hooks of the generated validators (crate::inputs::entries).
+pub(crate) fn end_before_start(input: &CreateEntryInput) -> bool {
+    input.stopped_at > input.started_at
 }
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateEntryInput {
-    pub id: String,
-    #[serde(default)]
-    pub project_id: Patch<String>,
-    #[serde(default)]
-    pub description: Patch<String>,
-    #[serde(default)]
-    pub ticket: Patch<String>,
-    #[serde(default)]
-    pub started_at: Patch<Timestamp>,
-    #[serde(default)]
-    pub stopped_at: Patch<Timestamp>,
+pub(crate) fn entry_too_long(input: &CreateEntryInput) -> bool {
+    input.stopped_at.0 - input.started_at.0 <= MAX_ENTRY_MS
 }
-
-impl Validate for UpdateEntryInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[
-        ("id", Field::RequiredId),
-        ("projectId", Field::NullableId),
-        ("description", Field::Description),
-        ("ticket", Field::Ticket),
-        ("startedAt", Field::Date),
-        ("stoppedAt", Field::Date),
-    ];
-    fn validate(&mut self) -> Result<()> {
-        if let Patch::Value(text) = &mut self.description {
-            trim(text);
-        }
-        Ok(())
-    }
+pub(crate) fn list_entries_input_range_end_before_start(input: &ListEntriesInput) -> bool {
+    input.to > input.from
 }
-
-#[derive(Deserialize)]
-pub struct DeleteEntryInput {
-    pub id: String,
-}
-
-impl Validate for DeleteEntryInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[("id", Field::RequiredId)];
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ListEntriesInput {
-    pub from: Timestamp,
-    pub to: Timestamp,
-    #[serde(default)]
-    pub user_id: Option<String>,
-}
-
-impl Validate for ListEntriesInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[
-        ("from", Field::RequiredDate),
-        ("to", Field::RequiredDate),
-        ("userId", Field::Id),
-    ];
-    fn validate(&mut self) -> Result<()> {
-        if self.to <= self.from {
-            return refuse_input("validation_range_end_before_start");
-        }
-        if self.to.0 - self.from.0 > MAX_LIST_DAYS * 86_400_000 {
-            return refuse_input_with(
-                "validation_range_too_long",
-                "days",
-                Param::Number(MAX_LIST_DAYS),
-            );
-        }
-        Ok(())
-    }
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GetFirstEntryStartInput {
-    pub user_id: String,
-}
-
-impl Validate for GetFirstEntryStartInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[("userId", Field::RequiredId)];
+pub(crate) fn list_entries_input_range_too_long(input: &ListEntriesInput) -> bool {
+    input.to.0 - input.from.0 <= MAX_LIST_DAYS * 86_400_000
 }
 
 #[derive(Clone, Debug, Serialize)]
