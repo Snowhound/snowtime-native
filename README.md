@@ -483,7 +483,7 @@ listener. Caddy remains as the sampler's access point but receives no app reques
 ## Performance gate
 
 The quick gate checks a change for regressions in about 1–2 minutes. It runs after
-builds finish, on Kait's Ryzen under WSL or on a Mac through Docker Desktop, and needs
+builds finish, on the Ryzen under WSL or on a Mac through Docker Desktop, and needs
 `deploy/load/app.patch` applied to `app/`. It retains the starting native server and
 `render-bench` binaries and alternates fresh processes in one session: baseline,
 current, baseline, current (A/B/A/B). It never rebuilds the baseline. Docker confines
@@ -576,7 +576,7 @@ try { wsl.exe } finally { [GateAwake]::SetThreadExecutionState([uint32]214748364
 
 Run the following in that WSL shell, at the committed starting revision. Finish all
 preparation before measuring. Keep the Ryzen idle and run one measurement at a time.
-No LAN generator or remote server is used. Kait runs every command on the Ryzen.
+No LAN generator or remote server is used. The maintainer runs every command on the Ryzen.
 
 ```sh
 baseline_date=$(date -u +%F)
@@ -686,7 +686,7 @@ machine awake and idle throughout the sequence.
 The calibration folder retains every attempt, its flagged metrics and exit code,
 and `calibration.json` with the final streak. A standalone identical check uses
 `--identical`. The 2026-10-08 noise-floor amendment is implemented; its two passing
-Ryzen calibration runs are pending Kait's execution and returned evidence.
+Ryzen calibration runs are pending the maintainer's execution and returned evidence.
 
 Exit codes are 0 for a passing gate, 1 for a flagged regression, and 2 for invalid
 measurements or setup errors. Generator validity takes precedence over every server
@@ -709,3 +709,9 @@ with the full-baseline output; retain the artifact/input folders on the Ryzen:
 ```sh
 tar -czf /tmp/native-gate-ryzen.tgz -C app/perf/.cache native-gate kit-baseline
 ```
+
+## License
+
+Licensed under either of [Apache License 2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at
+your option. The app in `app/` keeps its own license, and third-party code its own; see
+[THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES) and [licenses/](licenses/README.md).
