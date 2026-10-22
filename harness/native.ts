@@ -48,6 +48,7 @@ export async function startNative(
       ...(process.env.DB_READ_CONNECTIONS && {
         DB_READ_CONNECTIONS: process.env.DB_READ_CONNECTIONS,
       }),
+      ...(process.env.SQL_CAPTURE && { SQL_CAPTURE: process.env.SQL_CAPTURE }),
       EDGE_ACCESS_LOG: 'off',
       ...env,
     },

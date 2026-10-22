@@ -252,7 +252,18 @@ API's Hono app and Better Auth's endpoints, and calls each on the native server 
 session (the kit's route parity check, `route-parity.json`). All 45 API routes are
 implemented. Of Better Auth's 61 endpoints the port serves the 25 the app's client calls;
 the other 36 are listed as omitted, with the reason, and the check fails on any route that
-is neither. Both kit tools run from the kit revision `harness/kit.sh` names.
+is neither. The kit tools run from the kit revision `harness/kit.sh` names.
+
+## SQL per route
+
+`sql/` holds the SQL the app runs for each route, recorded while its conformance suite
+runs (the kit's SQL capture, task 081.48): per request, the database calls, statements,
+and transactions, and each distinct statement with how often it runs.
+`harness/sql-capture/capture.sh` records it with `harness/sql-capture/app.patch` applied
+in `app/` for the run, and `compare.sh` records the port, built with the `sql-capture`
+feature, and compares the two per route. The port does one statement more per request on
+purpose: it reads the session row on every check instead of the app's cookie cache, which
+`route-parity.json` lists as accepted.
 
 ## Run it
 

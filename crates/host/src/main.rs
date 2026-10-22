@@ -115,6 +115,8 @@ async fn serve(config: config::Config, perf_now: Option<i64>) {
             client_ip_header,
         }));
 
+    #[cfg(feature = "sql-capture")]
+    let pages = snowtime_server::sql_capture::layer(pages);
     let router = edge::router(api.merge(health), pages, &config.edge, &origin);
     let handle = axum_server::Handle::new();
     let shutdown_handle = handle.clone();

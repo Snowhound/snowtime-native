@@ -1,0 +1,94 @@
+diff --git a/perf/lib/app.ts b/perf/lib/app.ts
+index 6e939aa..c2e90e9 100644
+--- a/perf/lib/app.ts
++++ b/perf/lib/app.ts
+@@ -135,6 +135,7 @@ export async function startApp({
+       TURSO_DATABASE_URL: `file:${copy}`,
+       BETTER_AUTH_SECRET: 'perf-harness-secret-perf-harness-secret',
+       BETTER_AUTH_URL: url,
++      ...(process.env.SQL_CAPTURE ? { SQL_CAPTURE: process.env.SQL_CAPTURE } : {}),
+       ...env,
+     },
+   })
+diff --git a/src/db/index.ts b/src/db/index.ts
+index 37d1964..97c3f97 100644
+--- a/src/db/index.ts
++++ b/src/db/index.ts
+@@ -2,12 +2,15 @@
+ // Turso token must never reach the browser.
+ import { drizzle } from 'drizzle-orm/libsql'
+ import { env } from '~/env'
++import { captureClient } from '~/server/sql-capture.server'
+ import { timedClient } from '~/server/timing.server'
+ import { openClient } from './connection'
+ import { relations } from './relations'
+ 
+ export const db = drizzle({
+-  client: timedClient(openClient({ url: env.TURSO_DATABASE_URL, authToken: env.TURSO_AUTH_TOKEN })),
++  client: captureClient(
++    timedClient(openClient({ url: env.TURSO_DATABASE_URL, authToken: env.TURSO_AUTH_TOKEN })),
++  ),
+   relations,
+ })
+ 
+diff --git a/src/server-entry.ts b/src/server-entry.ts
+index 028b43b..38253eb 100644
+--- a/src/server-entry.ts
++++ b/src/server-entry.ts
+@@ -5,6 +5,7 @@ import { paraglideMiddleware } from '~/paraglide/server.js'
+ import { api } from '~/server/api.server'
+ import { contentSecurityPolicy, newNonce } from '~/server/csp.server'
+ import { localeRequest } from '~/server/locale.server'
++import { captureRequest } from '~/server/sql-capture.server'
+ import { serverTiming, time, withTiming } from '~/server/timing.server'
+ 
+ // The route loaders' calls during a server render go to the API in process, by URL and with
+@@ -14,7 +15,9 @@ setSend((path, init) => {
+   const headers = new Headers(init.headers)
+   const cookie = getRequest().headers.get('cookie')
+   if (cookie) headers.set('cookie', cookie)
+-  return api.request(path, { ...init, headers })
++  return captureRequest({ method: init.method ?? 'GET', url: path }, async () =>
++    api.request(path, { ...init, headers }),
++  )
+ })
+ 
+ // Scopes the locale to each request, so messages rendered on the server use the request's
+@@ -25,20 +28,22 @@ setSend((path, init) => {
+ // time ends at its first byte.
+ export default {
+   fetch(request: Request) {
+-    return withTiming(async () => {
+-      const nonce = newNonce()
+-      const cookie = request.headers.get('cookie') ?? ''
+-      const response = await time('render', () =>
+-        paraglideMiddleware(localeRequest(request), () =>
+-          handler.fetch(request, { context: { nonce, cookie } }),
+-        ),
+-      )
+-      if (!response.headers.get('content-type')?.startsWith('text/html')) return response
+-      // A copy, because a response's headers can be immutable.
+-      const page = new Response(response.body, response)
+-      page.headers.set('content-security-policy', contentSecurityPolicy(nonce))
+-      page.headers.set('server-timing', serverTiming(['session', 'db', 'render']))
+-      return page
+-    })
++    return captureRequest(request, () =>
++      withTiming(async () => {
++        const nonce = newNonce()
++        const cookie = request.headers.get('cookie') ?? ''
++        const response = await time('render', () =>
++          paraglideMiddleware(localeRequest(request), () =>
++            handler.fetch(request, { context: { nonce, cookie } }),
++          ),
++        )
++        if (!response.headers.get('content-type')?.startsWith('text/html')) return response
++        // A copy, because a response's headers can be immutable.
++        const page = new Response(response.body, response)
++        page.headers.set('content-security-policy', contentSecurityPolicy(nonce))
++        page.headers.set('server-timing', serverTiming(['session', 'db', 'render']))
++        return page
++      }),
++    )
+   },
+ }

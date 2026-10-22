@@ -231,7 +231,10 @@ pub fn router(app: Arc<App>) -> Router {
     let router = router.method_not_allowed_fallback(unknown).with_state(app);
     // A panic in async handler code answers 500 instead of resetting the connection, and an
     // in-process call from a page gets the same answer.
-    router.layer(tower_http::catch_panic::CatchPanicLayer::custom(panicked))
+    let router = router.layer(tower_http::catch_panic::CatchPanicLayer::custom(panicked));
+    #[cfg(feature = "sql-capture")]
+    let router = crate::sql_capture::layer(router);
+    router
 }
 fn panicked(_: Box<dyn std::any::Any + Send>) -> HttpResponse {
     Response::from(failure(500, "Internal error.")).into_response()

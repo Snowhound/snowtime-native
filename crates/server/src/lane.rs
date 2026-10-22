@@ -77,6 +77,11 @@ impl<C: Send + 'static> Lane<C> {
         #[cfg(feature = "bench")]
         let queued = crate::bench::Active::new(&crate::bench::QUEUED);
         let (send, answer) = tokio::sync::oneshot::channel();
+        #[cfg(feature = "sql-capture")]
+        let call = {
+            let request = crate::sql_capture::current();
+            move |state: &C| crate::sql_capture::with(request, || call(state))
+        };
         self.jobs
             .try_send(Box::new(move |state| {
                 let _permit = permit;

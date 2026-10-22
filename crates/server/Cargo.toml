@@ -11,6 +11,8 @@ workspace = true
 
 [features]
 bench = []
+# Writes each statement and request to SQL_CAPTURE (sql_capture.rs).
+sql-capture = []
 scrypt-bench = ["dep:scrypt"]
 
 [dependencies]

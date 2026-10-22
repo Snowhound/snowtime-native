@@ -15,6 +15,7 @@ path = "src/main.rs"
 
 [features]
 bench = ["snowtime-server/bench", "snowtime-render/bench"]
+sql-capture = ["snowtime-server/sql-capture"]
 
 [dependencies]
 async-trait = "0.1"

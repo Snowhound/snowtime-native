@@ -28,6 +28,8 @@ pub mod reports;
 pub mod schemas;
 pub mod scope;
 pub mod settings;
+#[cfg(feature = "sql-capture")]
+pub mod sql_capture;
 pub mod teams;
 pub mod timer;
 pub mod timestamp;

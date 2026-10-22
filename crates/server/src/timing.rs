@@ -25,7 +25,9 @@ fn trace(event: TraceEvent<'_>) {
                 s.set(Some(Instant::now()));
             }
         }),
-        TraceEvent::Profile(..) => {
+        TraceEvent::Profile(_stmt, _took) => {
+            #[cfg(feature = "sql-capture")]
+            crate::sql_capture::statement(&_stmt, _took);
             if let Some(started) = STARTED.with(Cell::take) {
                 DB.with(|db| db.set(db.get() + started.elapsed()));
             }

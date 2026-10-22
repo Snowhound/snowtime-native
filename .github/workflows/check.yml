@@ -71,8 +71,8 @@ jobs:
       - name: Clippy
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
 
-      - name: Clippy with bench
-        run: cargo clippy --locked --workspace --all-targets --features bench -- -D warnings
+      - name: Clippy with bench and SQL capture
+        run: cargo clippy --locked --workspace --all-targets --features bench,sql-capture -- -D warnings
 
       # The input validation generated from the app's valibot schemas is current at the
       # kit revision it names, and answers as the app does (harness/schema-gen.sh).
