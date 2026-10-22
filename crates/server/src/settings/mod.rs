@@ -7,38 +7,51 @@ use crate::schemas::Patch;
 use crate::{Code, Key, Result, refuse};
 use rusqlite::{Connection, OptionalExtension};
 
-pub fn find_settings(db: &Connection, user_id: &str) -> Result<Option<Settings>> {
-    let settings = crate::sql!("select time_zone, week_start, locale, theme, timer_layout, show_summary, compact_rows, wide_timer, timer_view, calendar_weekend, app_icon, scene_collection, scene_pin, scene_background, scene_strength, surfaces, scene_weather, scene_intro, scene_tagline, duration_format, date_format, time_format, copy_duration_pattern, copy_duration_control, country from user_settings where user_id = ",
-        user_id)
-    .query_row(db, |row| {
-        Ok(Settings {
-            time_zone: row.get(0)?,
-            week_start: row.get(1)?,
-            locale: row.get(2)?,
-            theme: row.get(3)?,
-            timer_layout: row.get(4)?,
-            show_summary: row.get(5)?,
-            compact_rows: row.get(6)?,
-            wide_timer: row.get(7)?,
-            timer_view: row.get(8)?,
-            calendar_weekend: row.get(9)?,
-            app_icon: row.get(10)?,
-            scene_collection: row.get(11)?,
-            scene_pin: row.get(12)?,
-            scene_background: row.get(13)?,
-            scene_strength: row.get(14)?,
-            surfaces: row.get(15)?,
-            scene_weather: row.get(16)?,
-            scene_intro: row.get(17)?,
-            scene_tagline: row.get(18)?,
-            duration_format: row.get(19)?,
-            date_format: row.get(20)?,
-            time_format: row.get(21)?,
-            copy_duration_pattern: row.get(22)?,
-            copy_duration_control: row.get(23)?,
-            country: row.get(24)?,
-        })
+// The settings' columns, in the order `settings` reads them.
+fn columns() -> crate::queries::Sql {
+    let mut sql = crate::queries::Sql::default();
+    sql.literal("time_zone, week_start, locale, theme, timer_layout, show_summary, compact_rows, wide_timer, timer_view, calendar_weekend, app_icon, scene_collection, scene_pin, scene_background, scene_strength, surfaces, scene_weather, scene_intro, scene_tagline, duration_format, date_format, time_format, copy_duration_pattern, copy_duration_control, country");
+    sql
+}
+
+fn settings(row: &rusqlite::Row<'_>) -> rusqlite::Result<Settings> {
+    Ok(Settings {
+        time_zone: row.get(0)?,
+        week_start: row.get(1)?,
+        locale: row.get(2)?,
+        theme: row.get(3)?,
+        timer_layout: row.get(4)?,
+        show_summary: row.get(5)?,
+        compact_rows: row.get(6)?,
+        wide_timer: row.get(7)?,
+        timer_view: row.get(8)?,
+        calendar_weekend: row.get(9)?,
+        app_icon: row.get(10)?,
+        scene_collection: row.get(11)?,
+        scene_pin: row.get(12)?,
+        scene_background: row.get(13)?,
+        scene_strength: row.get(14)?,
+        surfaces: row.get(15)?,
+        scene_weather: row.get(16)?,
+        scene_intro: row.get(17)?,
+        scene_tagline: row.get(18)?,
+        duration_format: row.get(19)?,
+        date_format: row.get(20)?,
+        time_format: row.get(21)?,
+        copy_duration_pattern: row.get(22)?,
+        copy_duration_control: row.get(23)?,
+        country: row.get(24)?,
     })
+}
+
+pub fn find_settings(db: &Connection, user_id: &str) -> Result<Option<Settings>> {
+    let settings = crate::sql!(
+        "select ",
+        columns(),
+        " from user_settings where user_id = ",
+        user_id
+    )
+    .query_row(db, settings)
     .optional()?;
     Ok(settings)
 }
@@ -107,7 +120,10 @@ pub fn update_settings(
     assignments.set_optional("copy_duration_control", input.copy_duration_control);
     assignments.set("country", input.country);
     let fields = assignments.finish();
-    if !fields.text().is_empty() {
+    // The update returns the settings it leaves, as the app's does, in one statement.
+    let settings = if fields.text().is_empty() {
+        find_settings(db, user_id)?
+    } else {
         crate::sql!(
             "update user_settings set ",
             fields,
@@ -116,11 +132,14 @@ pub fn update_settings(
             ", updated_by = ",
             user_id,
             " where user_id = ",
-            user_id
+            user_id,
+            " returning ",
+            columns()
         )
-        .execute(db)?;
-    }
-    find_settings(db, user_id)?.map_or_else(|| refuse(Code::NotFound, Key::SettingsNotFound), Ok)
+        .query_row(db, settings)
+        .optional()?
+    };
+    settings.map_or_else(|| refuse(Code::NotFound, Key::SettingsNotFound), Ok)
 }
 
 #[cfg(test)]

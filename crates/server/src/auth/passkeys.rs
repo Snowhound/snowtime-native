@@ -159,13 +159,12 @@ fn options(
         .unwrap()
         .to_owned();
     let (body, data) = if registration {
-        let email: String = db.query_row("select email from user where id=?1", [user_id], |r| {
-            r.get(0)
-        })?;
+        // The session check read the email with the session.
+        let email = user.map_or("", |u| u.email.as_str());
         let name = query["name"]
             .as_str()
             .filter(|s| !s.is_empty())
-            .unwrap_or(&email);
+            .unwrap_or(email);
         let mut selection = vec![
             ("residentKey", json!("preferred").to_string()),
             ("userVerification", json!("preferred").to_string()),

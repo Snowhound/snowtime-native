@@ -91,11 +91,19 @@ pub(crate) fn find_any_session_with_writer(
 ) -> rusqlite::Result<Option<Session>> {
     Ok(match find_session_using(db, config, cookie_header, now)? {
         Found::Session(session) => session,
-        Found::NeedsWriter { session, expired } => match gate.try_acquire() {
+        Found::NeedsWriter {
+            session,
+            token,
+            expired,
+        } => match gate.try_acquire() {
             Some(_permit) => {
                 let writer = writer.lock().unwrap_or_else(|e| e.into_inner());
-                // Another reader may have renewed the session since this one read it.
-                find_session(&writer, config, cookie_header, now)?
+                // Another request may have renewed or deleted the session since this one read
+                // it; only then does the writer read it again.
+                match maintain(&writer, &token, expired, now)? {
+                    Some(valid) => valid.then_some(session),
+                    None => find_session(&writer, config, cookie_header, now)?,
+                }
             }
             None => (!expired).then_some(session),
         },
@@ -105,7 +113,35 @@ pub(crate) fn find_any_session_with_writer(
 enum Found {
     Session(Option<Session>),
     // Renewing or deleting the session needs the writer; `db` is read-only.
-    NeedsWriter { session: Session, expired: bool },
+    NeedsWriter {
+        session: Session,
+        token: String,
+        expired: bool,
+    },
+}
+
+/// Deletes an expired session or renews a current one for 30 days, if the session is still
+/// as `db`'s read found it. Whether it is still valid, or None when the write changed no
+/// row: another request renewed or deleted it since that read.
+fn maintain(
+    db: &Connection,
+    token: &str,
+    expired: bool,
+    now: i64,
+) -> rusqlite::Result<Option<bool>> {
+    let changed = if expired {
+        db.execute(
+            "delete from session where token = ?1 and expires_at < ?2",
+            params![token, now],
+        )?
+    } else {
+        let expires_at = now + EXPIRES_IN_S * 1000;
+        db.execute(
+            "update session set expires_at = ?1, updated_at = ?2 where token = ?3 and expires_at < ?1",
+            params![expires_at, now, token],
+        )?
+    };
+    Ok((changed > 0).then_some(!expired))
 }
 
 fn find_session_using(
@@ -143,20 +179,20 @@ fn find_session_using(
     };
     let expired = expires_at < now;
     let renew = expires_at - EXPIRES_IN_S * 1000 + UPDATE_AGE_S * 1000 <= now;
-    if (expired || renew) && db.is_readonly("main")? {
-        return Ok(Found::NeedsWriter { session, expired });
+    if !(expired || renew) {
+        return Ok(Found::Session(Some(session)));
     }
-    if expired {
-        db.execute("delete from session where token = ?1", [token])?;
-        return Ok(Found::Session(None));
+    if db.is_readonly("main")? {
+        let token = token.to_owned();
+        return Ok(Found::NeedsWriter {
+            session,
+            token,
+            expired,
+        });
     }
-    if renew {
-        db.execute(
-            "update session set expires_at = ?1, updated_at = ?2 where token = ?3",
-            params![now + EXPIRES_IN_S * 1000, now, token],
-        )?;
-    }
-    Ok(Found::Session(Some(session)))
+    // On a writable connection nothing changes the row between the read and the write.
+    let valid = maintain(db, token, expired, now)?.unwrap_or(!expired);
+    Ok(Found::Session(valid.then_some(session)))
 }
 
 /// The signed-in user of a request's Cookie header, or None.

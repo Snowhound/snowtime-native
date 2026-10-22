@@ -338,7 +338,8 @@ One line each. A finished subtask's record is in git history: its link points at
 - 47: the kit's route parity check in CI: 106 routes, 70 implemented, 36 Better Auth
   endpoints the client never calls omitted on purpose (done; CI run 39805932733)
 - [48](48-sql-capture.md): the app's SQL per route from its conformance suite, the port's
-  the same way, and a comparison per route with the kit's SQL capture (in progress)
+  the same way, and a comparison per route with the kit's SQL capture; three port
+  findings fixed (in progress)
 
 Task 084 moved the TypeScript app from server functions to the same API, through one
 client module. Task 089 replaces that module's call table with routes and client functions

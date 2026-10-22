@@ -1,6 +1,6 @@
 # 081.48: SQL per route
 
-Status: in-progress (2026-10-22): captured and compared; three port findings open
+Status: in-progress (2026-10-22): captured, compared, and the three port findings fixed
 
 Record the SQL the app runs for each route as the porting aid, then record the port the
 same way and compare per route: calls, statements, repeated statements, transactions.
@@ -33,14 +33,21 @@ Measured 2026-10-22 on macOS, pin `40d9d35`:
   also on `main` without these changes (CI passed at `4a51936`). Its three routes are
   missing from the port's capture, and the request counts of 8 routes differ.
 - **Comparison:** 69 routes, 15 with notes. 8 of the notes are request counts only.
+  After the fixes below: 13 with notes, all request counts, routes missing from the port's
+  capture, or the invitation acceptance.
 
-Findings in the port, open:
+Findings in the port, fixed the same day:
 
-1. `GET /api/v1/session` reads the session row twice per request (in 6 of 8 requests).
-2. `PATCH /api/v1/settings` updates and then selects the settings, 3 statements to the
-   app's 1. The app's `update … returning` does both at once.
-3. `GET /api/auth/passkey/generate-register-options` reads the user's email after the
-   session check has already joined it.
+1. `GET /api/v1/session` read the session row twice per request (in 6 of 8 requests), on
+   every route when the session was due for renewal: the writer read it again before
+   renewing it. The writer now deletes or renews it with a conditional statement and reads
+   it again only if that changed no row, which happens when another request renewed or
+   deleted it first (the race test in `connections.rs`).
+2. `PATCH /api/v1/settings` updated and then selected the settings. The update now
+   returns them, as the app's `update … returning` does: 3 statements to 2, the app's 1
+   plus the session read.
+3. `GET /api/auth/passkey/generate-register-options` read the user's email after the
+   session check had already joined it: 4 statements to 3.
 
 `POST /api/v1/invitations/:id/accept` runs 8 statements in 1 transaction, where the app
 runs 13 in 2.
@@ -54,7 +61,7 @@ the data.
 
 - [x] The app's SQL per route in `sql/`, from its conformance suite at the pin.
 - [x] The port writes the same format behind a feature, and the comparison runs per route.
-- [ ] The three port findings fixed, or accepted with a reason.
+- [x] The three port findings fixed, or accepted with a reason.
 - [ ] The OAuth conformance file passes locally, or the failure is recorded as a known
       local issue.
 - [ ] `harness/kit.sh` names a pushed kit revision with the tool.
