@@ -336,7 +336,7 @@ One line each. A finished subtask's record is in git history: its link points at
 - 46: finished subtasks' records leave the tree for git history, with every link pointed
   at `9b197c7`, so an agent reads only current records (done)
 - 47: the kit's route parity check in CI: 106 routes, 70 implemented, 36 Better Auth
-  endpoints the client never calls omitted on purpose (done)
+  endpoints the client never calls omitted on purpose (done; CI run 39805932733)
 
 Task 084 moved the TypeScript app from server functions to the same API, through one
 client module. Task 089 replaces that module's call table with routes and client functions
