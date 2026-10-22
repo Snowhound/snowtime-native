@@ -2,8 +2,8 @@
 
 Status: todo
 
-Start the porting kit's crate extraction (081.05, the kit's `docs/design.md`, "Crates")
-with the auth code that the kit's auth recipe marks generic
+Start the porting kit's crate extraction (081.05, the kit's `docs/architecture.md`, "What
+goes in") with the auth code that the kit's auth recipe marks generic
 (`recipes/auth/better-auth.md`, "Reference code"). snowtime-native becomes the first
 consumer: it depends on the crates and keeps only Snowtime's policy. The design plans this
 step for once the port is complete and split, which it is.
@@ -26,7 +26,7 @@ The store reaches the database only through the host's lanes (`App::write_gate` 
 `read_gate`), so the lane comes out first, or the store takes a small trait that the app
 implements. The lane is in the design's crate list on its own.
 
-## Questions for Kait before the first commit
+## Questions for the maintainer before the first commit
 
 1. **Where the crates live and how snowtime-native builds them.** The kit's repository has
    no remote, and its rules say not to push. A path dependency (`../porting-kit/crates/…`)
@@ -40,9 +40,36 @@ implements. The lane is in the design's crate list on its own.
    each crate plugs in alone.
 3. **Names and license**, since the crates are meant to be published one day.
 
+## Answers
+
+Answered 2026-10-22:
+
+1. The crates live in the kit's repository, published as github.com/kaitk/porting-kit
+   under its working name. snowtime-native depends on them by git URL at an exact
+   commit, as it pins the better-auth-rs fork.
+2. Open, waiting for a second opinion from Codex. The proposal: three crates in one
+   workspace.
+   - `<kit>-lane`: `admission.rs` and `lane.rs`, on tokio alone, returning its own
+     refusal error that the app answers as its 503 or 500.
+   - `better-auth-session`: cookie, session check, and scrypt, with no better-auth-rs
+     dependency, so it also serves the hand-ported auth. The session check takes a
+     `&Connection` instead of the app's `Gate`.
+   - `better-auth-rs-sqlite`: store, transaction, and bridge, reaching lanes through a
+     small trait.
+
+   Couplings the scope table doesn't show: `lane.rs` needs `admission.rs`, both answer
+   with the app's `Response` and `wire::failure`, and `lane.rs` and `password.rs` count
+   into `crate::bench`.
+3. Crate names follow the kit's final name. The kit and its crates are MIT OR Apache-2.0,
+   like better-auth-rs, and snowtime-native moves to the same.
+
+better-auth-rs moved to v1.0.0-alpha.5 after an 828-commit rewrite since the pinned
+`9f91cd7`, and all seven upstream pull requests now conflict. The store is extracted only
+after a check against alpha.5, since its traits have probably changed.
+
 ## Steps
 
-1. Record Kait's answers here and in the kit's design.
+1. Record the maintainer's answers here and in the kit's `docs/decisions.md`.
 2. Extract the lane, with its tests, and switch snowtime-native to it. Run the bar.
 3. Extract the store, transaction, and bridge behind traits for what the app supplies:
    the lanes, the user and session hooks, and the client-address header. Move the store
@@ -55,7 +82,7 @@ implements. The lane is in the design's crate list on its own.
 
 ## Acceptance criteria
 
-- [ ] The three questions answered by Kait and recorded.
+- [ ] The three questions answered by the maintainer and recorded.
 - [ ] The crates build on their own with their tests, and none depends on Snowtime, Solid,
       or Start.
 - [ ] snowtime-native uses them, and its remaining auth code is Snowtime's policy and the
@@ -64,5 +91,5 @@ implements. The lane is in the design's crate list on its own.
       hardening 17, `page-compare.ts`, server, host, and render tests, cargo-deny,
       cargo-audit, licenses, and CI.
 - [ ] The performance gate passes against the `5a5cb9b` baseline.
-- [ ] The kit's recipe and design updated: crate names, versions, and what the app
+- [ ] The kit's recipe and architecture updated: crate names, versions, and what the app
       supplies to each.

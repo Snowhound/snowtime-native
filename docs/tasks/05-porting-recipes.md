@@ -2,24 +2,25 @@
 
 Status: todo (the last step: waits on task 081's port working and measured)
 
-Since 2026-10-09 the kit's design lives in the porting kit's repository (local, working
-name `porting-kit`), in `docs/design.md`; edit it there. This file is the copy it started
-from.
+Since 2026-10-09 the kit's design lives in the porting kit's repository
+(github.com/kaitk/porting-kit), split on 2026-10-22 into `docs/architecture.md`,
+`docs/decisions.md`, `docs/catalogue.md`, and task 001; edit it there. This file is
+the copy it started from.
 
-Kait's goal (2026-10-03): what task 081 learns becomes a separate repository of recipes,
+The goal (2026-10-03): what task 081 learns becomes a separate repository of recipes,
 skills, crates, and codemods for porting a modern cloud app to one Rust server with a
 local SQLite database, first on one instance and later with Turso. AI sessions do the
 porting; the repository gives them guidelines, because each port differs. It starts from
 this app's stack (SolidJS, TanStack Start, Drizzle, Better Auth) and may later cover
 others, such as SvelteKit or Postgres.
 
-Kait, 2026-10-05: the stretch goal is that, where an app's stack matches closely enough,
+2026-10-05: the stretch goal is that, where an app's stack matches closely enough,
 a session ports an app of this one's size from its server functions in one run, with the
 kit's crates, patterns, and codemods. The kit aims at that goal but isn't bounded by it: a
 better designed, more capable kit is worth a few more runs. The kit is also honest about
 when a port isn't worth doing.
 
-Kait, 2026-10-08, the kit's shape and the repositories:
+2026-10-08, the kit's shape and the repositories:
 
 - The kit works like a project template that agents run. Agents run its workflow: they
   ask the questions, plan the details, and generate an opinionated first version of the
@@ -135,7 +136,7 @@ it:
   provisional 2-GiB whole-host budget for M, with no OOM or swap and passing recovery.
   Open: the four-configuration capacity rerun and valid eight-reader overload in 26.
   Results: [native host](../../docs/architecture/native-host.md)
-- Static files served from disk, behind a CDN or caching proxy (Kait, 2026-10-08,
+- Static files served from disk, behind a CDN or caching proxy (2026-10-08,
   from audit finding M6 in 30). Snowtime runs behind Cloudflare, which caches the
   immutable `/assets/` and the week-cached `/backgrounds/` and `/brand/`, so few file
   requests reach the origin. The host keeps an index of the public directory's paths
@@ -157,7 +158,7 @@ it:
   a single-organization burst (17). A single connection still delays timers while a
   report runs. Open: valid overload and capacity evidence at the chosen backstop in 27
 - Tokio at the edge, lanes behind it ([native-host.md](../../docs/architecture/native-host.md),
-  2026-10-06; a design guideline for the kit, Kait 2026-10-08). From
+  2026-10-06; a design guideline for the kit, 2026-10-08). From
   [Tina](https://github.com/pmbanugo/tina), adopt what fits a Tokio stack: everything
   bounded, immediate refusal as backpressure, CPU work kept off the event loop,
   supervised workers with a restart budget, and no work for callers that left. Measured
@@ -181,7 +182,7 @@ it:
   passkey UV policy, followed by compatibility and HTTP conformance runs. Alpha.3
   alone does not pass that gate.
 
-  Kait, 2026-10-08: the kit's auth recipe uses better-auth-rs for the flows. Fix its
+  2026-10-08: the kit's auth recipe uses better-auth-rs for the flows. Fix its
   gaps in a fork, offer each fix upstream, and depend on the fork only where a fix
   isn't accepted. What better-auth-rs lacks goes in a separate crate beside it: the
   closest usable subsets of task 081's port with Snowtime's policies taken out, such
@@ -199,7 +200,7 @@ it:
   finite pages like Snowtime's. A framework that relies on streaming, such as SvelteKit's
   streamed promises or Next.js's server components, needs its own adapter and delivery
   policy, and the survey says so instead of promising one run. Open: the memory target,
-  which awaits Kait's agreement (01)
+  which awaits the maintainer's agreement (01)
 - Conformance tests and byte comparison as the definition of done (081 question 4, 03)
 - The repository layout (task 081, "Repository")
 - HTTP/3 deferred. Open: measured in 09
@@ -237,7 +238,7 @@ The survey answers this with the user, and is honest about what each choice cost
   frame; 081.01), search engines see only the frame,
   and the frame's dynamic parts must be kept in step between the app and Rust. Where the
   content is SPA-like anyway and the frame is mostly static, this is the clear choice
-  (Kait, 2026-10-05).
+  (2026-10-05).
 - **The built client as static files, and the API alone.** The simplest: no frame from
   the server at all. The content waits for the bundle and the first API calls, which the
   frame option at least shortens by showing the app's shell at once.
@@ -271,7 +272,7 @@ The survey says plainly where a port is doubtful:
 
 ## The workflow
 
-Kait, 2026-10-03: a port runs in three steps, and the session proposes nothing before the
+2026-10-03: a port runs in three steps, and the session proposes nothing before the
 user has checked what it found.
 
 1. **Survey.** The session reads the app and lists everything that needs porting, by
@@ -311,7 +312,7 @@ app keeps its server functions and gains the JSON API beside them, as task 084 d
 server function gets an operation (method, path, input and output schemas), its logic
 sits in a rule shaped `(db, scope, input)` that both the server function and the API
 call, and conformance tests over HTTP define what the Rust port must pass. Once every
-call has moved, the server functions go, for both backends (task 084, Kait, 2026-10-03).
+call has moved, the server functions go, for both backends (task 084, 2026-10-03).
 
 The client keeps one frontend for both backends through one client module, whose
 transports reach the API over HTTP or, during a server render, in process (tasks 084 and
@@ -336,7 +337,7 @@ reports one of three verdicts for each:
 
 The user reviews the report as part of step 2.
 
-The move from server functions to the API is a standard recipe (Kait, 2026-10-03), not a
+The move from server functions to the API is a standard recipe (2026-10-03), not a
 step only this app needed: task 084 does it for all of this app's calls. Its rules
 include that a GET only reads. A read works out what it needs, and only an explicit write
 saves it, so a read that repairs state (an active organization, a cookie, a missing row)
@@ -348,7 +349,7 @@ the one accepted exception.
 The kit prefers a clean design: every call ported natively, behind one API. A hybrid,
 where some code keeps running as TypeScript, is a tradeoff the session proposes only when
 the clean design isn't straightforward, and it says what the hybrid costs and how the app
-would leave it later (Kait, 2026-10-05).
+would leave it later (2026-10-05).
 
 Usage and profiles decide where the line goes, not guesses: the app's access logs or
 analytics show which calls are used and how often, and a profile under the load model
@@ -361,7 +362,7 @@ as recipes:
   Perry (subtask 04). This fits an app with many server functions for features few people
   use, where the core ports easily. Examples are payment or cloud SDKs, PDF or XLSX
   generation, and an auth flow its Rust library lacks. Auth itself ports to better-auth-rs
-  (task 081, question 5); a job is the fallback for a flow it doesn't have yet. Kait, 2026-10-06:
+  (task 081, question 5); a job is the fallback for a flow it doesn't have yet. 2026-10-06:
   - **Not the renderers.** Jobs run in their own lane, with their own bundle, an
     admission budget below timer calls, and a pool that starts on demand and exits when
     idle, since a rarely used job shouldn't hold memory. A slow job never blocks pages.
@@ -386,7 +387,7 @@ as recipes:
   an AI SDK's, has no recipe yet.
 
 - **Server functions served from Rust**, for apps where moving to an API costs too much,
-  such as hundreds of server functions of kinds 1 to 3 (Kait, 2026-10-05). The host
+  such as hundreds of server functions of kinds 1 to 3 (2026-10-05). The host
   answers `/_serverFn/<id>`, decodes and encodes Start's serialization format, and
   repeats Start's checks (`Sec-Fetch-Site`), redirects, and headers. Start is open
   source, so the protocol can be read; the cost, which this hybrid accepts, is that it
@@ -410,7 +411,7 @@ as recipes:
 
 ### Layers that swap independently
 
-Kait, 2026-10-05: the kit works layer by layer, so swapping one layer of the stack leaves
+2026-10-05: the kit works layer by layer, so swapping one layer of the stack leaves
 the rest usable. An app on SvelteKit with the same Drizzle, Better Auth, and SQLite should
 reuse every backend recipe and crate, and the survey should name exactly what is missing
 for SvelteKit, rather than fail or guess. Those recipes don't have to exist yet; the
@@ -444,9 +445,9 @@ layering does.
       server-function baseline (before task 084: the first parent of `2f13db0`), and its
       result passes the conformance tests and byte comparison. The replay records its
       runs, what the user did between them, and each gap it hit
-- [ ] Each gap fixed in the kit or recorded as a known limit. Kait reviews each difference
-      from task 081's port: its survey, verdict, kind of port, rendering choice, and
-      decisions. A better decision goes into the catalogue
+- [ ] Each gap fixed in the kit or recorded as a known limit. The maintainer reviews each
+      difference from task 081's port: its survey, verdict, kind of port, rendering
+      choice, and decisions. A better decision goes into the catalogue
 - [ ] The number of runs recorded, with what stood between the replay and the one-run
       goal; meeting the goal isn't required
 - [ ] The layering checked: no crate depends on Solid or Start, and a survey of an app
@@ -458,5 +459,5 @@ layering does.
       guesses
 - [ ] Capacity per machine size: how many users and organizations a ported app serves at
       task 078's load model on three Hetzner sizes, from 1 vCPU and 2 GB up, measured on
-      Linux. Kait, 2026-10-07: the aim is a headline such as "one Hetzner instance this
+      Linux. 2026-10-07: the aim is a headline such as "one Hetzner instance this
       size could run all of a company like AMD North America"
