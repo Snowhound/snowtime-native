@@ -342,6 +342,8 @@ One line each. A finished subtask's record is in git history: its link points at
   findings fixed (in progress)
 - [49](49-date-parse.md): dates read as Node's `Date.parse` reads them, with the kit's port of
   V8's parser; the differential test's date exclusion is gone (done)
+- [50](50-deno-core-audit.md): what leaving deno_core for the bare `v8` crate would take: the
+  pages call 22 of 288 ops, about 1,100 to 1,400 lines of Rust; stay for now (done)
 
 Task 084 moved the TypeScript app from server functions to the same API, through one
 client module. Task 089 replaces that module's call table with routes and client functions
