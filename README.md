@@ -245,6 +245,15 @@ generated file lists its hooks with the app's source. `harness/schema-gen.sh` ch
 files at the kit revision it names and compares 16,375 inputs with the app's own decoder;
 `--write` regenerates them after the pin moves.
 
+## Route coverage
+
+`bun harness/route-parity.ts <binary>` lists the app's routes from its own routers, the
+API's Hono app and Better Auth's endpoints, and calls each on the native server without a
+session (the kit's route parity check, `route-parity.json`). All 45 API routes are
+implemented. Of Better Auth's 61 endpoints the port serves the 25 the app's client calls;
+the other 36 are listed as omitted, with the reason, and the check fails on any route that
+is neither. Both kit tools run from the kit revision `harness/kit.sh` names.
+
 ## Run it
 
 The native host reads inherited environment variables only. It doesn't load `.env`

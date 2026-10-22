@@ -1,0 +1,62 @@
+{
+  "app": "app",
+  "env": {
+    "TURSO_DATABASE_URL": "file::memory:",
+    "BETTER_AUTH_SECRET": "route-parity-route-parity-route-parity",
+    "BETTER_AUTH_URL": "http://localhost:3000",
+    "NODE_ENV": "development"
+  },
+  "sources": [
+    {
+      "kind": "hono",
+      "module": "src/server/api.server.ts#api"
+    },
+    {
+      "kind": "better-auth",
+      "module": "src/server/auth/better-auth.server.ts#auth"
+    }
+  ],
+  "omitted": [
+    {
+      "reason": "Better Auth endpoints the app's client never calls; the port serves the ones it does (081.28), and the API's own routes replace the rest",
+      "routes": [
+        "GET /api/auth/account-info",
+        "POST /api/auth/change-email",
+        "POST /api/auth/change-password",
+        "POST /api/auth/delete-user",
+        "GET /api/auth/delete-user/callback",
+        "POST /api/auth/get-access-token",
+        "GET /api/auth/get-session",
+        "POST /api/auth/get-session",
+        "GET /api/auth/list-sessions",
+        "GET /api/auth/ok",
+        "POST /api/auth/organization/delete",
+        "GET /api/auth/organization/get-active-member",
+        "GET /api/auth/organization/get-active-member-role",
+        "GET /api/auth/organization/get-full-organization",
+        "GET /api/auth/organization/get-invitation",
+        "GET /api/auth/organization/get-organization",
+        "POST /api/auth/organization/has-permission",
+        "POST /api/auth/organization/invite-member",
+        "GET /api/auth/organization/list",
+        "GET /api/auth/organization/list-invitations",
+        "GET /api/auth/organization/list-members",
+        "GET /api/auth/organization/list-user-invitations",
+        "POST /api/auth/organization/reject-invitation",
+        "POST /api/auth/passkey/update-passkey",
+        "POST /api/auth/refresh-token",
+        "POST /api/auth/request-password-reset",
+        "POST /api/auth/reset-password",
+        "GET /api/auth/reset-password/:token",
+        "POST /api/auth/revoke-other-sessions",
+        "POST /api/auth/revoke-session",
+        "POST /api/auth/revoke-sessions",
+        "POST /api/auth/send-verification-email",
+        "POST /api/auth/sign-up/email",
+        "POST /api/auth/update-session",
+        "GET /api/auth/verify-email",
+        "POST /api/auth/verify-password"
+      ]
+    }
+  ]
+}

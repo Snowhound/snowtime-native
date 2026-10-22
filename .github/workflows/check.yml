@@ -94,6 +94,7 @@ jobs:
           bun harness/conformance.ts target/debug/snowtime-axum
           bun harness/compare.ts target/debug/snowtime-axum
           bun harness/hardening-compare.ts target/debug/snowtime-axum
+          bun harness/route-parity.ts target/debug/snowtime-axum
 
       # deploy/load/app.patch must still apply to the pinned app, type-check, and pass its
       # tests; app/ is restored after, so later steps see the pinned commit.
