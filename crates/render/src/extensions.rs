@@ -1,7 +1,7 @@
 #[path = "encoding.rs"]
 mod encoding;
 
-// Headers, Request, Response, and their body mixin, from deno_fetch 0.276.0's scripts in
+// Headers, Request, Response, and their body mixin, from deno_fetch 0.284.0's scripts in
 // vendor/deno_fetch, without the crate: its ops and deno_net's open sockets, resolve DNS, and
 // speak TLS, which no page needs. Keeping the extension's name keeps the scripts' specifiers.
 deno_core::extension!(

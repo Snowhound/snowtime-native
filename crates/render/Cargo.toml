@@ -21,10 +21,10 @@ required-features = ["api-bench"]
 [dependencies]
 ada-url = { version = "4.0.0", optional = true }
 encoding_rs = { version = "0.8.35", optional = true }
-deno_core = "0.405"
+deno_core = "0.413"
 deno_error = "0.7"
-deno_web = "0.283"
-deno_webidl = "0.252"
+deno_web = "0.291"
+deno_webidl = "0.260"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "macros"] }
@@ -32,7 +32,7 @@ anyhow = "1"
 libc = "0.2"
 
 [build-dependencies]
-deno_core = "0.405"
-deno_web = "0.283"
-deno_webidl = "0.252"
+deno_core = "0.413"
+deno_web = "0.291"
+deno_webidl = "0.260"
 tokio = { version = "1", features = ["rt", "time"] }
