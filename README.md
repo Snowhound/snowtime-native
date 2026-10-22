@@ -20,12 +20,12 @@ deploy/        the release image, the V8 archive script, and the load harness pa
 docs/          the port's architecture and the 081 records
 ```
 
-Pinned at snowtime `981832f`, `main`'s head on 2026-10-10. The pin records which of the
+Pinned at snowtime `40d9d35`, `main`'s head on 2026-10-22. The pin records which of the
 app's features the port implements and which client bundle it serves. A `main` commit
 that doesn't change the port's output in a meaningful way, such as tests, tooling, or
 docs, can move the pin with no porting once the bar passes. The pin doesn't have to
 follow every commit: the port catches up on features at its own pace. Against the pin
-the native host passes all 66 conformance tests (570 assertions, 13 files), all 1,490
+the native host passes all 67 conformance tests (572 assertions, 13 files), all 1,490
 `compare.ts` calls byte for byte, and the 17 `hardening-compare.ts` checks.
 `node_modules` links to `app/node_modules`, so the harness and the adapter run on the
 app's packages.

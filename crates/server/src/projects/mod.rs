@@ -441,10 +441,10 @@ mod tests {
     #[test]
     fn project_validation_orders_fields_and_counts_utf16() {
         assert!(
-            matches!(decode::<CreateProjectInput>(json!({"id":ID,"name":" ","color":"bad"})), Err(Error::Invalid(message)) if message == "Enter a name.")
+            matches!(decode::<CreateProjectInput>(json!({"id":ID,"name":" ","color":"bad"})), Err(Error::Invalid(invalid)) if invalid.message == "Enter a name.")
         );
         assert!(
-            matches!(decode::<UpdateProjectInput>(json!({"id":ID,"name":"😀".repeat(51)})), Err(Error::Invalid(message)) if message == "Use at most 100 characters.")
+            matches!(decode::<UpdateProjectInput>(json!({"id":ID,"name":"😀".repeat(51)})), Err(Error::Invalid(invalid)) if invalid.message == "Use at most 100 characters.")
         );
         assert!(decode::<UpdateProjectInput>(json!({"id":ID,"name":null})).is_err());
     }

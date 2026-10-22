@@ -329,10 +329,10 @@ mod tests {
     #[test]
     fn invitation_and_issue_link_schemas_match_order_and_normalization() {
         assert!(
-            matches!(decode::<InviteMemberInput>(json!({"email":"bad","role":"lead","teamId":"bad"})),Err(Error::Invalid(message)) if message=="Enter a valid email address.")
+            matches!(decode::<InviteMemberInput>(json!({"email":"bad","role":"lead","teamId":"bad"})),Err(Error::Invalid(invalid)) if invalid.message =="Enter a valid email address.")
         );
         assert!(
-            matches!(decode::<InviteMemberInput>(json!({"email":"good@example.com","role":"member"})),Err(Error::Invalid(message)) if message=="Invalid key: Expected \"teamId\" but received undefined")
+            matches!(decode::<InviteMemberInput>(json!({"email":"good@example.com","role":"member"})),Err(Error::Invalid(invalid)) if invalid.message =="Invalid key: Expected \"teamId\" but received undefined")
         );
         assert_eq!(
             decode::<InviteMemberInput>(

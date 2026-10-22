@@ -139,7 +139,7 @@ fn creates_the_row_the_plugin_creates() {
 #[test]
 fn refuses_names_and_lifetimes_the_schema_refuses() {
     let refused = |input: serde_json::Value| match decode::<CreateApiKeyInput>(input) {
-        Err(Error::Invalid(message)) => message,
+        Err(Error::Invalid(invalid)) => invalid.message,
         _ => panic!("expected a validation refusal"),
     };
     assert_eq!(

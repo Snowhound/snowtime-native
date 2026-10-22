@@ -16,7 +16,7 @@ pub(crate) fn invitation_email(text: &str) -> Result<()> {
     trim(&mut text);
     let pattern = PATTERN.get_or_init(|| regex::Regex::new(r"^[a-zA-Z0-9_+-]+(?:\.[a-zA-Z0-9_+-]+)*@[0-9a-zA-Z]+(?:[.-][0-9a-zA-Z]+)*\.[a-zA-Z]{2,}$").expect("Valibot email pattern"));
     if !pattern.is_match(&text) {
-        return invalid("Enter a valid email address.");
+        return refuse_input("validation_email");
     }
     Ok(())
 }
@@ -52,7 +52,7 @@ pub(crate) fn issue_links(text: &str) -> Result<()> {
     let mut text = text.to_owned();
     trim(&mut text);
     if text.encode_utf16().count() > 500 {
-        return invalid("Use at most 500 characters.");
+        return refuse_input_with("validation_too_long", "max", Param::Number(500));
     }
     if text.is_empty() {
         return Ok(());
@@ -68,12 +68,10 @@ pub(crate) fn issue_links(text: &str) -> Result<()> {
                 && !path.chars().any(js_whitespace)
         });
     if !valid {
-        return invalid(
-            "Enter an https:// address, such as https://yourcompany.atlassian.net/browse/{key}.",
-        );
+        return refuse_input_with("validation_issue_links_https", "key", Param::Text("{key}"));
     }
     if !text.contains("{key}") {
-        return invalid("Put {key} where the ticket key goes, such as …/browse/{key}.");
+        return refuse_input_with("validation_issue_links_key", "key", Param::Text("{key}"));
     }
     Ok(())
 }
@@ -906,10 +904,14 @@ fn api_key_name(text: &str) -> Result<()> {
     let mut text = text.to_owned();
     trim(&mut text);
     if text.is_empty() {
-        return invalid("Enter a name.");
+        return refuse_input("validation_name_required");
     }
     if text.encode_utf16().count() > API_KEY_NAME_MAX_LENGTH {
-        return invalid(format!("Use at most {API_KEY_NAME_MAX_LENGTH} characters."));
+        return refuse_input_with(
+            "validation_too_long",
+            "max",
+            Param::Number(API_KEY_NAME_MAX_LENGTH as i64),
+        );
     }
     Ok(())
 }

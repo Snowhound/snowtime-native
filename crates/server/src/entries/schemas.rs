@@ -28,12 +28,14 @@ impl Validate for CreateEntryInput {
     fn validate(&mut self) -> Result<()> {
         trim(&mut self.description);
         if self.stopped_at <= self.started_at {
-            return invalid("The end must be after the start.");
+            return refuse_input("validation_end_before_start");
         }
         if self.stopped_at.0 - self.started_at.0 > MAX_ENTRY_MS {
-            return invalid(format!(
-                "An entry can be at most {MAX_ENTRY_HOURS} hours long."
-            ));
+            return refuse_input_with(
+                "validation_entry_too_long",
+                "hours",
+                Param::Number(MAX_ENTRY_HOURS),
+            );
         }
         Ok(())
     }
@@ -98,10 +100,14 @@ impl Validate for ListEntriesInput {
     ];
     fn validate(&mut self) -> Result<()> {
         if self.to <= self.from {
-            return invalid("The range must end after it starts.");
+            return refuse_input("validation_range_end_before_start");
         }
         if self.to.0 - self.from.0 > MAX_LIST_DAYS * 86_400_000 {
-            return invalid(format!("The range can span at most {MAX_LIST_DAYS} days."));
+            return refuse_input_with(
+                "validation_range_too_long",
+                "days",
+                Param::Number(MAX_LIST_DAYS),
+            );
         }
         Ok(())
     }

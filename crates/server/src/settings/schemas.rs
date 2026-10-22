@@ -43,11 +43,11 @@ fn time_zone(name: &str) -> Result<()> {
                     .all(|b| b.is_ascii_alphanumeric() || b"_+-".contains(&b))
         });
     if !valid {
-        return invalid("Use a time zone such as Europe/Tallinn.");
+        return refuse_input("validation_time_zone_format");
     }
     // ICU rejects tzdb's placeholder Factory zone, which jiff can read.
     if name.eq_ignore_ascii_case("Factory") || Zone::get(name).is_none() {
-        return invalid("Unknown time zone.");
+        return refuse_input("validation_time_zone_unknown");
     }
     Ok(())
 }
@@ -67,7 +67,7 @@ fn copy_duration_pattern(pattern: &str) -> Result<()> {
         }
     }
     if !field || pattern.encode_utf16().count() > 40 {
-        return invalid("Use H, M, or S, in at most 40 characters.");
+        return refuse_input("validation_copy_duration_pattern");
     }
     Ok(())
 }
@@ -190,7 +190,9 @@ mod tests {
         let result = decode::<UpdateSettingsInput>(
             json!({"country": "FI", "locale": "bad", "timeZone": "Mars/Olympus"}),
         );
-        assert!(matches!(result, Err(Error::Invalid(message)) if message == "Unknown time zone."));
+        assert!(
+            matches!(result, Err(Error::Invalid(invalid)) if invalid.message == "Unknown time zone.")
+        );
         let patch: UpdateSettingsInput = decode(json!({"showSummary": "false", "sceneWeather": "true", "scenePin": null, "country": null})).unwrap();
         assert_eq!(patch.show_summary, Some(false));
         assert_eq!(patch.scene_weather, Some(true));
@@ -211,7 +213,7 @@ mod tests {
         for pattern in ["", "hms", "\\H", too_long.as_str(), astral.as_str()] {
             let result = decode::<UpdateSettingsInput>(json!({"copyDurationPattern": pattern}));
             assert!(
-                matches!(result, Err(Error::Invalid(message)) if message == "Use H, M, or S, in at most 40 characters."),
+                matches!(result, Err(Error::Invalid(invalid)) if invalid.message == "Use H, M, or S, in at most 40 characters."),
                 "{pattern}"
             );
         }

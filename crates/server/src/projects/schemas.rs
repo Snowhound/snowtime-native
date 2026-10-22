@@ -5,7 +5,7 @@ fn color(text: &str) -> Result<()> {
         || !text.starts_with('#')
         || !text.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
     {
-        return invalid("Use a color like #4E79A7.");
+        return refuse_input("validation_color_format");
     }
     Ok(())
 }
