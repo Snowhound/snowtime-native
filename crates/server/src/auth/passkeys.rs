@@ -299,7 +299,7 @@ fn registration(
     }
     let mut name = body["name"].as_str().map(str::to_owned);
     if let Some(name) = &mut name {
-        crate::schemas::trim(name);
+        *name = crate::inputs::runtime::trim(name);
     }
     let name = name.filter(|s| !s.is_empty());
     let verified = (|| -> Result<Passkey, Box<dyn std::error::Error>> {

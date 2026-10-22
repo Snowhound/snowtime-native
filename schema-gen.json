@@ -1,0 +1,66 @@
+{
+  "app": "app",
+  "modules": [
+    "src/server/schemas.ts",
+    "src/server/*/*.schemas.ts"
+  ],
+  "inputs": "Input$",
+  "probe": "src/server/schemas.ts#issueMessage",
+  "rust": {
+    "out": "crates/server/src/inputs",
+    "dateType": "crate::timestamp::Timestamp",
+    "dateParse": "crate::timestamp::Timestamp::parse",
+    "hooks": "crate::{module}::schemas",
+    "revive": {
+      "dates": true,
+      "booleans": true
+    },
+    "types": {
+      "reports.IsoDate": "crate::calendar::Day",
+      "ReportInput.unit": "crate::reports::schemas::Unit",
+      "reports.ReportEntriesInput.row?": "crate::reports::schemas::EntryRow",
+      "reports.ReportEntriesInput.after?": "crate::reports::schemas::DayCursor",
+      "UpdateIssueLinksInput.issueLinks": "Option<String>"
+    },
+    "derives": {
+      "ReportInput": [
+        "Clone"
+      ],
+      "ProjectIdInput": [
+        "serde::Serialize"
+      ],
+      "ProjectTeamInput": [
+        "serde::Serialize"
+      ],
+      "TeamIdInput": [
+        "serde::Serialize"
+      ],
+      "TeamMemberInput": [
+        "serde::Serialize"
+      ],
+      "SetTeamRoleInput": [
+        "serde::Serialize"
+      ],
+      "UpdateSettingsInput": [
+        "Default"
+      ]
+    }
+  },
+  "differential": {
+    "runner": "cargo run -q -p snowtime-server --example schema-run",
+    "decode": "src/lib/api/wire.ts#decode",
+    "exclude": [
+      {
+        "values": [
+          "2026-9-24",
+          "2026-02-30",
+          "-1",
+          "1.5",
+          "ABC-123",
+          "abc-123"
+        ],
+        "reason": "dates V8's legacy parser accepts and Timestamp::parse refuses (task 45)"
+      }
+    ]
+  }
+}

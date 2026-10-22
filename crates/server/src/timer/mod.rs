@@ -94,7 +94,7 @@ pub fn start_timer(db: &Connection, scope: &Scope, input: StartTimerInput) -> Re
         let tx = Transaction::new_unchecked(db, TransactionBehavior::Immediate)?;
         // The stop goes with the checks; a failed check rolls it back.
         assert_still_member(&tx, scope)?;
-        if let Some(project_id) = &input.project_id {
+        if let Some(project_id) = input.project_id.value() {
             assert_usable_project(&tx, scope, project_id)?;
         }
         assert_entry_room(
@@ -106,8 +106,8 @@ pub fn start_timer(db: &Connection, scope: &Scope, input: StartTimerInput) -> Re
         )?;
         let stopped = stop_running(&tx, &scope.user_id, now, None)?;
         let started = crate::sql!("insert into time_entry (id, organization_id, user_id, project_id, description, ticket, started_at, created_by, updated_by) values (",
-            input.id, ", ", &scope.organization_id, ", ", &scope.user_id, ", ", input.project_id,
-            ", ", input.description, ", ", input.ticket, ", ", now, ", ", &scope.user_id, ", ", &scope.user_id,
+            input.id, ", ", &scope.organization_id, ", ", &scope.user_id, ", ", input.project_id.value(),
+            ", ", input.description, ", ", input.ticket.value(), ", ", now, ", ", &scope.user_id, ", ", &scope.user_id,
             ") returning ", entry_columns()).query_row(&tx, entry_of)?;
         tx.commit()?;
         Ok(StartedTimer { started, stopped })

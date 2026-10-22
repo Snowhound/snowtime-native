@@ -11,7 +11,7 @@ pub fn update_issue_links(
     if !is_admin(scope) {
         return refuse(Code::Forbidden, Key::OrganizationForbidden);
     }
-    let links = (!input.issue_links.is_empty()).then_some(input.issue_links);
+    let links = input.issue_links;
     Ok(crate::sql!(
         "update organization set issue_links = ",
         links,

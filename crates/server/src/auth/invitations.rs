@@ -342,9 +342,10 @@ mod tests {
             .email,
             "good@example.com"
         );
-        assert!(issue_links("https://localhost/{key}").is_err());
-        assert!(issue_links("https://example.com/").is_err());
-        assert!(issue_links("https://example.com/{key}").is_ok());
+        let links = |text: &str| decode::<UpdateIssueLinksInput>(json!({ "issueLinks": text }));
+        assert!(links("https://localhost/{key}").is_err());
+        assert!(links("https://example.com/").is_err());
+        assert!(links("https://example.com/{key}").is_ok());
         let db = database();
         let mut scope = scope();
         let saved = super::super::organization::update_issue_links(

@@ -1,98 +1,34 @@
 use crate::fill::FillSummary;
+pub use crate::inputs::auth::*;
 use crate::schemas::*;
 use crate::scope::OrgRole;
 use crate::settings::schemas::Settings;
 
-#[derive(Deserialize)]
-pub struct GetInvitationInput {
-    pub id: String,
+// Hooks of the generated validators (crate::inputs::auth). An https:// address with a host
+// name that has a dot, then a path, and no spaces; empty turns the links off.
+pub(crate) fn issue_links_https(text: &str) -> bool {
+    text.is_empty()
+        || text
+            .strip_prefix("https://")
+            .and_then(|rest| rest.split_once('/'))
+            .is_some_and(|(host, path)| {
+                host.contains('.')
+                    && host
+                        .split('.')
+                        .all(|part| !part.is_empty() && !part.chars().any(js_whitespace))
+                    && !path.chars().any(js_whitespace)
+            })
 }
-impl Validate for GetInvitationInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[("id", Field::RequiredId)];
+pub(crate) fn issue_links_key(text: &str) -> bool {
+    text.is_empty() || text.contains("{key}")
 }
-pub(crate) fn invitation_email(text: &str) -> Result<()> {
-    static PATTERN: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
-    let mut text = text.to_owned();
-    trim(&mut text);
-    let pattern = PATTERN.get_or_init(|| regex::Regex::new(r"^[a-zA-Z0-9_+-]+(?:\.[a-zA-Z0-9_+-]+)*@[0-9a-zA-Z]+(?:[.-][0-9a-zA-Z]+)*\.[a-zA-Z]{2,}$").expect("Valibot email pattern"));
-    if !pattern.is_match(&text) {
-        return refuse_input("validation_email");
-    }
-    Ok(())
-}
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InviteMemberInput {
-    pub email: String,
-    pub role: String,
-    pub team_id: Option<String>,
-}
-impl Validate for InviteMemberInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[
-        (
-            "email",
-            Field::CheckedString {
-                required: true,
-                check: invitation_email,
-            },
-        ),
-        (
-            "role",
-            Field::RequiredPicklist(&["member", "admin", "owner"]),
-        ),
-        ("teamId", Field::RequiredNullableId),
-    ];
-    fn validate(&mut self) -> Result<()> {
-        trim(&mut self.email);
-        self.email = self.email.to_lowercase();
-        Ok(())
+// Empty becomes null.
+pub(crate) fn issue_links_transform(value: &mut serde_json::Value) {
+    if value.as_str() == Some("") {
+        *value = serde_json::Value::Null;
     }
 }
-pub(crate) fn issue_links(text: &str) -> Result<()> {
-    let mut text = text.to_owned();
-    trim(&mut text);
-    if text.encode_utf16().count() > 500 {
-        return refuse_input_with("validation_too_long", "max", Param::Number(500));
-    }
-    if text.is_empty() {
-        return Ok(());
-    }
-    let valid = text
-        .strip_prefix("https://")
-        .and_then(|rest| rest.split_once('/'))
-        .is_some_and(|(host, path)| {
-            host.contains('.')
-                && host
-                    .split('.')
-                    .all(|part| !part.is_empty() && !part.chars().any(js_whitespace))
-                && !path.chars().any(js_whitespace)
-        });
-    if !valid {
-        return refuse_input_with("validation_issue_links_https", "key", Param::Text("{key}"));
-    }
-    if !text.contains("{key}") {
-        return refuse_input_with("validation_issue_links_key", "key", Param::Text("{key}"));
-    }
-    Ok(())
-}
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateIssueLinksInput {
-    pub issue_links: String,
-}
-impl Validate for UpdateIssueLinksInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[(
-        "issueLinks",
-        Field::CheckedString {
-            required: true,
-            check: issue_links,
-        },
-    )];
-    fn validate(&mut self) -> Result<()> {
-        trim(&mut self.issue_links);
-        Ok(())
-    }
-}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IssueLinks {
@@ -892,61 +828,6 @@ mod input_bounds_tests {
             1
         );
     }
-}
-
-// Personal API keys (docs/architecture/auth.md, "API keys"). The name's limit is the
-// api-key plugin's default, which the plugin checks again.
-const API_KEY_NAME_MAX_LENGTH: usize = 32;
-const API_KEY_LIFETIMES: &[&str] = &["30d", "90d", "1y", "none"];
-const API_KEY_ACCESS: &[&str] = &["read", "write"];
-
-fn api_key_name(text: &str) -> Result<()> {
-    let mut text = text.to_owned();
-    trim(&mut text);
-    if text.is_empty() {
-        return refuse_input("validation_name_required");
-    }
-    if text.encode_utf16().count() > API_KEY_NAME_MAX_LENGTH {
-        return refuse_input_with(
-            "validation_too_long",
-            "max",
-            Param::Number(API_KEY_NAME_MAX_LENGTH as i64),
-        );
-    }
-    Ok(())
-}
-
-// The lifetime is always explicit: no expiry is a choice, never a missing value.
-#[derive(Deserialize)]
-pub struct CreateApiKeyInput {
-    pub name: String,
-    pub lifetime: String,
-    pub access: String,
-}
-impl Validate for CreateApiKeyInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[
-        (
-            "name",
-            Field::CheckedString {
-                required: true,
-                check: api_key_name,
-            },
-        ),
-        ("lifetime", Field::RequiredPicklist(API_KEY_LIFETIMES)),
-        ("access", Field::RequiredPicklist(API_KEY_ACCESS)),
-    ];
-    fn validate(&mut self) -> Result<()> {
-        trim(&mut self.name);
-        Ok(())
-    }
-}
-
-#[derive(Deserialize)]
-pub struct RevokeApiKeyInput {
-    pub id: String,
-}
-impl Validate for RevokeApiKeyInput {
-    const FIELDS: &'static [(&'static str, Field)] = &[("id", Field::RequiredId)];
 }
 
 // A listed key: its name and settings, never any part of the key. The field order is
