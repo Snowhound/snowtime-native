@@ -4,7 +4,7 @@ Status: todo
 
 The porting kit (subtask 05) is meant for apps on other frameworks too, and every render
 optimization so far was measured only on this app's Solid pages. Solid's getter props are
-a pattern V8 handles badly ([engine-gap report](server-rendering/engine-gap-wsl.md)), so
+a pattern V8 handles badly ([engine-gap report](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/server-rendering/engine-gap-wsl.md)), so
 the V8-to-JSC gap and the value of each optimization may differ per framework. This task
 adds open-source apps on other frameworks to the render benchmarks, so a change is kept
 only if it doesn't hurt them.

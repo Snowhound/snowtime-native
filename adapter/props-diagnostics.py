@@ -29,7 +29,7 @@ for page in ('timer', 'week', 'month', 'year'):
                          'semi_space': semi, 'renders': 551,
                          'scavenges': text.count(' Scavenge '),
                          'mark_compacts': text.count(' Mark-Compact ')})
-out = root/'docs/tasks/server-rendering/shared-props-mac-diagnostics.jsonl'
+out = root/'temp/shared-props-mac-diagnostics.jsonl'
 out.write_text('\n'.join(json.dumps(r, separators=(',', ':')) for r in rows)+'\n')
 print('| Page | defineProperty getters | Fresh defineProperty getters | defineProperties getters | Getter literals evaluated | Literal getters created |')
 print('| --- | ---: | ---: | ---: | ---: | ---: |')

@@ -6,8 +6,8 @@ after the overload measurements of tasks 081.03 and 081.10, a review of
 [case against async/await for mixed network and CPU work](https://pmbanugo.me/blog/why-async-await-complect-concurrency),
 and an adversarial review of this design the same day. Rendering has its own record in
 [native-rendering.md](native-rendering.md). Items marked _planned_ aren't built yet;
-[task 081.17](../tasks/17-bounded-lanes.md) built the first set,
-and [task 081.34](../tasks/34-edge.md) built the database owner
+[task 081.17](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/17-bounded-lanes.md) built the first set,
+and [task 081.34](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/34-edge.md) built the database owner
 threads and the file index decided below.
 
 ## Tokio at the edge, lanes behind it
@@ -43,7 +43,7 @@ Every lane is a gate taken asynchronously in front of dedicated threads, or a pr
 fed by a bounded channel, as the V8 renderers are. Task 081.10 first ran database work
 through a semaphore and `spawn_blocking`, with Tokio's blocking threads capped at
 readers plus one. The maintainer decided on 2026-10-08, from finding M6 of
-[task 081.30](../tasks/30-audit.md), that every lane gets its own
+[task 081.30](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/30-audit.md), that every lane gets its own
 threads and Tokio's blocking pool holds no lane. The audit found that the pool also runs
 `tokio::fs` for static files and reqwest's DNS lookups. On one core the writer then
 shared its only thread with every page's file probes, so admitted database work waited
@@ -66,7 +66,7 @@ had its own threads, so that its lower priority doesn't carry over to database w
 
 Memory-resident static files were rejected: Snowtime runs behind Cloudflare, which caches
 the public files, so preloading them (36 MB) would serve only cache misses. The porting
-kit records when preloading fits ([05](../tasks/05-porting-recipes.md)).
+kit records when preloading fits ([05](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/05-porting-recipes.md)).
 
 | Lane             | Built                                                                                                                                                                   | _Planned_                               |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
@@ -194,7 +194,7 @@ single runs do not establish a material latency gain from the dedicated workers.
 
 Input hashes, image IDs, per-kind counts, timer-call timings, 503 timings, queue peaks,
 and generator checks are recorded in
-[bursts.json](../tasks/lane-measurements/bursts.json).
+[bursts.json](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/lane-measurements/bursts.json).
 Raw requests, samples, k6 summaries, settings, commands, and logs remain in the
 `081-lanes` worktree's `perf/.cache/stress/runs/*08117*` and `perf/.cache/stress/08117/`.
 Capacity and overload results are recorded below; the remaining matrix is task 081.27.
@@ -224,7 +224,7 @@ CPU claim, particularly at the higher offer with differing refusals.
 | `current_thread` |  5000 |          1.66 |       6.5 |           14.1 |          45.8 |   0 / 12502 |            8 |
 | `current_thread` | 15000 |          1.18 |      12.1 |           19.9 |          61.1 | 228 / 37250 |            8 |
 
-[Runtime evidence](../tasks/lane-measurements/runtime.json) retains
+[Runtime evidence](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/lane-measurements/runtime.json) retains
 counts, timings, counters, samples' process summaries, and the raw result locations.
 The queue decision is recorded below. Task 081.27 holds the remaining capacity and overload runs.
 
@@ -343,7 +343,7 @@ cores for k6; its configured 15,872 MiB container limit exceeds the VM's physica
 The shared-host memory guard remains enabled. A valid eight-reader overload run
 needs more generator headroom or lower-cost instrumentation with equivalent checks.
 
-[Structured ramp evidence](../tasks/lane-measurements/ramp.json)
+[Structured ramp evidence](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/lane-measurements/ramp.json)
 records the capacities, per-step validity, status counts, timings, sampled RSS, queue
 peaks, image IDs, and input hashes. Task 081.27 holds the remaining valid overload and capacity matrix. The later
 sections record the memory criterion, queue choice, and tested refusal fix.
@@ -385,10 +385,10 @@ The queue-sizing review below rejects 128 as an ordinary admission limit. This
 trial does not confirm 80,000-user capacity. Its image also resets the isolate on
 every API refusal; the reviewed implementation keeps completed renders warm.
 
-[Trial evidence](../tasks/lane-measurements/confirm-128.json),
-[raw k6 summary](../tasks/lane-measurements/confirm-128-k6-summary.json),
-and [runner output](../tasks/lane-measurements/confirm-128.log)
-retain the observations. [Native test output](../tasks/lane-measurements/native-tests.log)
+[Trial evidence](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/lane-measurements/confirm-128.json),
+[raw k6 summary](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/lane-measurements/confirm-128-k6-summary.json),
+and [runner output](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/lane-measurements/confirm-128.log)
+retain the observations. [Native test output](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/lane-measurements/native-tests.log)
 records 14 host, eight renderer, and 36 server tests passing, including API-refusal
 propagation through a rendered page.
 
@@ -430,9 +430,9 @@ sampler gap is 1.008 seconds, so the user's sleep/move does not interrupt this r
 Both the larger backstop and renderer-reuse fix are in the image; this confirmation
 does not isolate their contributions.
 
-[Confirmation evidence](../tasks/lane-measurements/confirm-4096.json),
-[raw k6 summary](../tasks/lane-measurements/confirm-4096-k6-summary.json),
-and [runner output](../tasks/lane-measurements/confirm-4096.log)
+[Confirmation evidence](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/lane-measurements/confirm-4096.json),
+[raw k6 summary](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/lane-measurements/confirm-4096-k6-summary.json),
+and [runner output](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/lane-measurements/confirm-4096.log)
 retain the result, input references, image IDs, source hashes, and timing continuity.
-[Review test output](../tasks/lane-measurements/review-native-tests.log)
+[Review test output](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/lane-measurements/review-native-tests.log)
 records 59 passing native tests, including completed-render reuse after API refusal.

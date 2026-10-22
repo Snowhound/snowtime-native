@@ -178,9 +178,9 @@ unless `splitProps` re-homed it. Nothing in the bundle reads symbol keys of prop
 copies their descriptors outside `splitProps`. The build rejects changed upstream
 merge/split helpers and generated-name collisions.
 
-[Task 081.20's report](../../docs/tasks/server-rendering/shared-props-mac.md)
+[Task 081.20's report](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/server-rendering/shared-props-mac.md)
 records the measurements, getter counts, and GC diagnostics.
-[Task 081.21's report](../../docs/tasks/server-rendering/hot-spots-mac.md)
+[Task 081.21's report](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/server-rendering/hot-spots-mac.md)
 records the later merge, split, and Lucide changes: V8's shared bundle at 1.12–1.27 times
 Bun's plain bundle. To compare the bundles, build
 `snowtime-render:props-plain` and `snowtime-render:props-shared` with the build argument,
@@ -282,7 +282,7 @@ proportional collection/replacement thresholds. It is a memory-policy diagnostic
 not a production recommendation: the host supplies its own thresholds. The four-page
 allocation investigation, raw timings, profiler overhead, rejected candidates, and
 remaining gap are in
-[the WSL report](../../docs/tasks/server-rendering/render-allocations-wsl.md).
+[the WSL report](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/server-rendering/render-allocations-wsl.md).
 
 Before committing a render change, run render Cargo tests and Clippy, the browser
 hydration check, `bun run test`, harness lint, formatting, and both Knip checks. Keep

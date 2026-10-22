@@ -150,7 +150,7 @@ rejected, as in task 069.
    with a `rusqlite` store through the host's database gate. Keep better-auth-rs as
    the target, but don't adopt this release unchanged: API key and passkey gaps,
    final lane integration, and broader conformance checks remain. Keep the native
-   signed-cookie check and AWS-LC scrypt. [Results and recommendation](auth-spike.md)
+   signed-cookie check and AWS-LC scrypt. [Results and recommendation](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/auth-spike.md)
    record the evidence and adoption gates.
 
    It has no teams: they're its roadmap phases 14 and 15, outside its v1 scope, and on
@@ -239,87 +239,91 @@ which records the edge measurements.
 
 ## Subtasks
 
-- [01](01-server-rendering.md): server rendering in the native backend
-- [02](02-api-contract.md): the API contract and the frontend adapter
-- [03](03-port-libraries.md): the Rust libraries, chosen on a small port of the timer
+One line each. A finished subtask's record is in git history: its link points at
+`9b197c7`, the last commit with every record, where its evidence files are too (subtask
+46, 2026-10-22). Open or recent subtasks keep their files here.
+
+- [01](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/01-server-rendering.md): server rendering in the native backend
+- [02](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/02-api-contract.md): the API contract and the frontend adapter
+- [03](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/03-port-libraries.md): the Rust libraries, chosen on a small port of the timer
 - [04](04-perry.md): Perry, a native TypeScript compiler, in place of the isolate or the
   Rust port
-- [05](05-porting-recipes.md): the porting kit: recipes, crates, and codemods, once the port
+- [05](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/05-porting-recipes.md): the porting kit: recipes, crates, and codemods, once the port
   works
-- [06](06-server-layout.md): the Rust server's layout and routing, mirroring task 089's
+- [06](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/06-server-layout.md): the Rust server's layout and routing, mirroring task 089's
   routes per domain
-- [07](07-edge-in-process.md): tuning Caddy, then TLS, certificates, compression, and logs
+- [07](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/07-edge-in-process.md): tuning Caddy, then TLS, certificates, compression, and logs
   in the Rust binary
-- [08](08-fast-scrypt.md): a faster scrypt for the native sign-in
-- [09](09-http3.md): HTTP/3 in the native host, measured against HTTP/2
-- [10](10-load-and-scaling.md): whole-server load, core and memory scaling, and a measured
+- [08](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/08-fast-scrypt.md): a faster scrypt for the native sign-in
+- [09](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/09-http3.md): HTTP/3 in the native host, measured against HTTP/2
+- [10](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/10-load-and-scaling.md): whole-server load, core and memory scaling, and a measured
   read-connection pool (local protocol complete)
-- [11](11-turso-engine.md): Turso's engine, its speed against SQLite, and its backups
-- [12](12-profiling.md): profiles of both servers under load, once features and tests are done
-- [13](13-render-allocations.md): render allocations and the remaining engine gap
-- [14](14-render-gc.md): render garbage that dies young, and a heap policy that allows a
+- [11](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/11-turso-engine.md): Turso's engine, its speed against SQLite, and its backups
+- [12](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/12-profiling.md): profiles of both servers under load, once features and tests are done
+- [13](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/13-render-allocations.md): render allocations and the remaining engine gap
+- [14](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/14-render-gc.md): render garbage that dies young, and a heap policy that allows a
   larger nursery (done)
 - [15](15-framework-benchmarks.md): render benchmarks on Nuxt, SvelteKit, and Next.js apps
-- [16](16-javascriptcore.md): JavaScriptCore as the render engine: the gate failed on plain
+- [16](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/16-javascriptcore.md): JavaScriptCore as the render engine: the gate failed on plain
   JSC; the Bun render sidecar that followed is parked in favor of V8 (2026-10-07)
-- [17](17-bounded-lanes.md): the lane contract for the database, hashing, and V8 render
+- [17](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/17-bounded-lanes.md): the lane contract for the database, hashing, and V8 render
   lanes, the overload policy, and how the client handles refusal (done)
-- [18](18-v8-builds.md): newer V8 builds, flags, and build options against the render gap:
+- [18](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/18-v8-builds.md): newer V8 builds, flags, and build options against the render gap:
   no V8 upgrade closes it, so rely on the Bun sidecar (cancelled)
-- [19](19-prototype-props.md): server props with prototype getters instead of per-render
+- [19](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/19-prototype-props.md): server props with prototype getters instead of per-render
   getters, as Solid 2.0 compiles them, behind a bundle flag: off by default on both
   engines (done)
-- [20](20-shared-accessors.md): server props with shared own accessors, as Solid 2.0
+- [20](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/20-shared-accessors.md): server props with shared own accessors, as Solid 2.0
   ships them: the V8 default, while Bun keeps the plain bundle (done)
-- [21](21-render-hot-spots.md): one more profiling pass for small rewrites of hot bundle
+- [21](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/21-render-hot-spots.md): one more profiling pass for small rewrites of hot bundle
   code like task 20's: V8 at 1.12–1.27 times Bun, within 1.2 on timer and week (done)
-- [22](22-render-follow-ups.md): task 21's cheap follow-ups: app formatter fixes and an
+- [22](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/22-render-follow-ups.md): task 21's cheap follow-ups: app formatter fixes and an
   ASCII minified bundle take 7–9 MB off V8's render RSS; V8 at 1.21–1.30 times Bun (done)
-- [23](23-render-month-year.md): month and year render hot spots, where V8 is still 1.27–1.29
+- [23](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/23-render-month-year.md): month and year render hot spots, where V8 is still 1.27–1.29
   times Bun: the report code, the shared site getter, and Lucide's icon building
-- [24](24-report-reads.md): the report's breakdown, entry lists, and export in the native
+- [24](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/24-report-reads.md): the report's breakdown, entry lists, and export in the native
   server, through the report budget
-- [25](25-router-state.md): the router's hydration state per page, measured by bytes and
+- [25](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/25-router-state.md): the router's hydration state per page, measured by bytes and
   allocations rather than timing alone
-- [26](26-functional-port.md): sign-in reads and sign-out, settings, project and team
+- [26](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/26-functional-port.md): sign-in reads and sign-out, settings, project and team
   writes, invitations, and issue links; done with 880 byte-equal comparison calls
-- [27](27-capacity-overload.md): the capacity matrix at the deadline-led queue bound
+- [27](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/27-capacity-overload.md): the capacity matrix at the deadline-led queue bound
   and a valid eight-reader overload comparison; follows 17 without blocking its merge
 
-- [28](28-auth-port.md): invitation acceptance, passkeys, Google/OAuth, and the
+- [28](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/28-auth-port.md): invitation acceptance, passkeys, Google/OAuth, and the
   remaining client auth and organization calls
-- [29](29-hardening.md): client IPs, rate limits, request panic checks, and clean native
+- [29](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/29-hardening.md): client IPs, rate limits, request panic checks, and clean native
   TypeScript before the full port audit
-- [30](30-audit.md): the whole-port audit before the repository split: three high and
+- [30](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/30-audit.md): the whole-port audit before the repository split: three high and
   eleven medium findings, and the feature level that matches `main` at `c8ffa84`
-- [31](31-input-bounds.md): auth input bounds, ordered metadata parsing, and expired
+- [31](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/31-input-bounds.md): auth input bounds, ordered metadata parsing, and expired
   verification cleanup from the audit (done)
-- [32](32-domains.md): `ALLOWED_LOGIN_DOMAINS` on existing sessions and password sign-in,
+- [32](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/32-domains.md): `ALLOWED_LOGIN_DOMAINS` on existing sessions and password sign-in,
   and Better Auth's error page (done)
-- [33](33-sql.md): migration foreign-key checks, atomic auth writes, immediate
+- [33](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/33-sql.md): migration foreign-key checks, atomic auth writes, immediate
   transactions, and static SQL literals (done)
-- [34](34-edge.md): edge connection limits, rate-limit keys, database owner threads, and
+- [34](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/34-edge.md): edge connection limits, rate-limit keys, database owner threads, and
   the public file index from the audit (done)
-- [35](35-edge-config.md): configuration refusals, the bench-only clock, trusted proxies,
+- [35](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/35-edge-config.md): configuration refusals, the bench-only clock, trusted proxies,
   private ACME files, CDN keep-alive defaults, and session reads for the login-domain check
   from the audit (done)
-- [36](36-render.md): renderer fixes from the audit: no network extensions, the rustls
+- [36](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/36-render.md): renderer fixes from the audit: no network extensions, the rustls
   update, heap headroom, API limits, a read-only in-process transport, and renderer
   lifecycle (done)
-- [37](37-supply-chain.md): supply chain and harness before the split: ring out of the
+- [37](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/37-supply-chain.md): supply chain and harness before the split: ring out of the
   graph, a checked V8 download, third-party notices, the auth spike removed, a pinned
   toolchain and base images, a native CI job, and a second-organization conformance file
-- [38](38-api-keys.md): personal API keys from `main`'s task 093: the `keys` routes, the key
+- [38](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/38-api-keys.md): personal API keys from `main`'s task 093: the `keys` routes, the key
   check, Settings' key calls, and the plugin's row, at `main` `1eedd18` (done)
-- [39](39-better-auth-rs.md): auth through better-auth-rs with the app's passkey module,
+- [39](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/39-better-auth-rs.md): auth through better-auth-rs with the app's passkey module,
   cookie check, and scrypt sign-in beside it, measured against the Mac gate's baseline
   (done; superseded by 42)
-- [40](40-passkey-plugin.md): passkeys through better-auth-rs's plugin, compared with the
+- [40](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/40-passkey-plugin.md): passkeys through better-auth-rs's plugin, compared with the
   app's module: 44 of 151 steps matched, so the module stays (done; superseded by 42)
 - [41](41-kit-auth-crates.md): the kit's first crates: the lane, the auth store and
   bridge, and the cookie, session check, and scrypt, with snowtime-native as their first
   consumer (todo)
-- [42](42-hand-port-auth.md): auth back on 081.28's hand-port, with better-auth-rs and the
+- [42](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/42-hand-port-auth.md): auth back on 081.28's hand-port, with better-auth-rs and the
   fork removed, since the library cut no code and alpha.5 requires system ICU
   (done)
 - [43](43-dependency-updates.md): deno_core 0.413 with V8 150.4, tokio, hyper, and aws-lc-rs,
@@ -329,6 +333,8 @@ which records the edge measurements.
 - [45](45-generated-schemas.md): input structs and validation generated from the app's
   valibot schemas with the kit's schema generator, replacing the hand-written tables
   (done)
+- 46: finished subtasks' records leave the tree for git history, with every link pointed
+  at `9b197c7`, so an agent reads only current records (done)
 
 Task 084 moved the TypeScript app from server functions to the same API, through one
 client module. Task 089 replaces that module's call table with routes and client functions

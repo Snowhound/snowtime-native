@@ -18,7 +18,7 @@ two pieces of task 081:
 
 Perry 0.5.1520 (commit `381045a8735f`, the latest npm release, 3,337 commits behind its
 `main`), on macOS 26.3.1 arm64. Log:
-[perry-0.5.1520.log](server-rendering/perry-0.5.1520.log).
+[perry-0.5.1520.log](https://github.com/Snowhound/snowtime-native/blob/9b197c7/docs/tasks/server-rendering/perry-0.5.1520.log).
 
 - **The render bundle doesn't compile.** `ArrayPush(…): local not in scope` in TanStack
   Router's matcher (`getNodeMatch`). The minimal case is pushing an object onto a `const`
