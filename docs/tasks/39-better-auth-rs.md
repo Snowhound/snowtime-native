@@ -1,6 +1,6 @@
 # 081.39: Auth through better-auth-rs, with passkeys beside it
 
-Status: done (2026-10-11): sign-out, OAuth, and API key creation on the library; the fork pushed and offered upstream; the gate passing
+Status: done (2026-10-11): sign-out, OAuth, and API key creation on the library; the fork pushed and offered upstream; the gate passing. Superseded 2026-10-22 by 081.42: the port is back on its own auth code and better-auth-rs is removed
 
 Move the port's auth onto better-auth-rs, the intended library ([question 5](README.md),
 2026-10-06), on a branch, and measure what it costs. This applies the kit's auth

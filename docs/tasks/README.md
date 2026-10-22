@@ -313,12 +313,15 @@ which records the edge measurements.
   check, Settings' key calls, and the plugin's row, at `main` `1eedd18` (done)
 - [39](39-better-auth-rs.md): auth through better-auth-rs with the app's passkey module,
   cookie check, and scrypt sign-in beside it, measured against the Mac gate's baseline
-  (done)
+  (done; superseded by 42)
 - [40](40-passkey-plugin.md): passkeys through better-auth-rs's plugin, compared with the
-  app's module: 44 of 151 steps matched, so the module stays (done)
+  app's module: 44 of 151 steps matched, so the module stays (done; superseded by 42)
 - [41](41-kit-auth-crates.md): the kit's first crates: the lane, the auth store and
   bridge, and the cookie, session check, and scrypt, with snowtime-native as their first
   consumer (todo)
+- [42](42-hand-port-auth.md): auth back on 081.28's hand-port, with better-auth-rs and the
+  fork removed, since the library cut no code and alpha.5 requires system ICU
+  (done)
 
 Task 084 moved the TypeScript app from server functions to the same API, through one
 client module. Task 089 replaces that module's call table with routes and client functions

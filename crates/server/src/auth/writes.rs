@@ -272,7 +272,7 @@ fn rule(
     };
     match action {
         Action::Profile => {
-            if super::callback_urls::truthy(&body["email"]) {
+            if super::sign_out::truthy(&body["email"]) {
                 return Ok(refusal(
                     400,
                     "EMAIL_CAN_NOT_BE_UPDATED",
@@ -724,8 +724,7 @@ impl App {
         if let Err(r) = fetch.validate(self.config.app_origin(), false) {
             return r;
         }
-        if let Err(r) =
-            super::callback_urls::check_urls(&request, Some(&body), self.config.app_origin())
+        if let Err(r) = super::sign_out::check_urls(&request, Some(&body), self.config.app_origin())
         {
             return r;
         }

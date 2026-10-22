@@ -70,8 +70,6 @@ async fn serve(config: config::Config, perf_now: Option<i64>) {
         config.limits,
     )
     .expect("the database opens");
-    // A configuration better-auth-rs refuses stops the server here rather than on a request.
-    app.start_auth().await;
     let api = snowtime_server::router(app.clone());
 
     let limit = memory::limit();

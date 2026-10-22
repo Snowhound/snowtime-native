@@ -10,21 +10,16 @@ step for once the port is complete and split, which it is.
 
 ## Scope
 
-From `crates/server/src/`:
+From `crates/server/src/`, after 081.42 restores 081.28's hand-port. The kit's task 002
+reviews the seams and the behavior each extraction must keep.
 
-| Code                       | Lines | Generic part                                                                                           | Stays in snowtime-native                                         |
-| -------------------------- | ----: | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| `lane.rs`                  |   234 | The whole lane: admission bounded by count and time, refusal, restart budget                            | The lane sizes                                                   |
-| `auth/library/store.rs`    | 1,080 | The store traits on `rusqlite` over lanes, column mapping, `f64` binds, `'null'` metadata, refusing stores | `create_user` and `create_session` hooks: login domains, unverified sign-ups |
-| `auth/library/transaction.rs` | 129 | Async transactions on a dedicated writer with their own deadline                                      |                                                                  |
-| `auth/library/bridge.rs`   |   179 | Host request in, library answer out; a lane's refusal answered as the host's 503                        | The client-address header's name                                 |
-| `auth/cookie.rs`           |   109 | better-call's signed cookies                                                                           |                                                                  |
-| `auth/session.rs`          |   280 | The session row and its per-request check, with renewal                                               | Expiry and renewal settings                                      |
-| `auth/password.rs`         |    90 | Better Auth's scrypt hashes on AWS-LC                                                                  |                                                                  |
+| Crate                       | Code                                                                 | Stays in snowtime-native                                   |
+| --------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `<kit>-lane`                | `admission.rs` (190) and `lane.rs` (234): admission bounded by count and time, refusal, cancellation | Lane sizes, the 503 and 500 bodies, benchmark counters |
+| `<kit>-better-auth-session` | `auth/cookie.rs` (109), `auth/session.rs` (280), `auth/password.rs` (90) | Expiry and renewal settings, login domains, user-agent bounds |
+| `<kit>-better-auth-compat`  | Sign-in (472), sign-out (183), OAuth (1,370), API keys (273), passkeys (927), organization writes (1,711), the error page (486), and their schemas (1,194) | HTTP composition, Snowtime's roles and validation, the providers' configuration |
 
-The store reaches the database only through the host's lanes (`App::write_gate` and
-`read_gate`), so the lane comes out first, or the store takes a small trait that the app
-implements. The lane is in the design's crate list on its own.
+The lane's restart budget belongs to the renderer (081.17), not to `lane.rs`.
 
 ## Questions for the maintainer before the first commit
 
@@ -46,43 +41,37 @@ Answered 2026-10-22:
 
 1. The crates live in the kit's repository, published as github.com/kaitk/porting-kit
    under its working name. snowtime-native depends on them by git URL at an exact
-   commit, as it pins the better-auth-rs fork.
-2. Open, waiting for a second opinion from Codex. The proposal: three crates in one
-   workspace.
-   - `<kit>-lane`: `admission.rs` and `lane.rs`, on tokio alone, returning its own
-     refusal error that the app answers as its 503 or 500.
-   - `better-auth-session`: cookie, session check, and scrypt, with no better-auth-rs
-     dependency, so it also serves the hand-ported auth. The session check takes a
-     `&Connection` instead of the app's `Gate`.
-   - `better-auth-rs-sqlite`: store, transaction, and bridge, reaching lanes through a
-     small trait.
+   commit, never by a path to a sibling checkout.
+2. Three crates in one workspace, as in the scope table: the lane, Better Auth sessions,
+   and Better Auth compatibility. The third was first planned as a better-auth-rs storage
+   adapter; on 2026-10-22 the port went back to its own auth code (081.42), and the kit
+   owns its Better Auth compatibility code, with better-auth-rs only as a reference
+   (porting-kit `docs/decisions.md`). Codex reviewed the boundaries and agreed; its
+   review is the kit's task 002.
 
    Couplings the scope table doesn't show: `lane.rs` needs `admission.rs`, both answer
    with the app's `Response` and `wire::failure`, and `lane.rs` and `password.rs` count
-   into `crate::bench`.
+   into `crate::bench`. The session check returns a result the app acts on when renewal
+   needs the writer, instead of taking the app's `Gate`.
 3. Crate names follow the kit's final name. The kit and its crates are MIT OR Apache-2.0,
-   like better-auth-rs, and snowtime-native moves to the same.
-
-better-auth-rs moved to v1.0.0-alpha.5 after an 828-commit rewrite since the pinned
-`9f91cd7`, and all seven upstream pull requests now conflict. The store is extracted only
-after a check against alpha.5, since its traits have probably changed.
+   and snowtime-native moved to the same.
 
 ## Steps
 
 1. Record the maintainer's answers here and in the kit's `docs/decisions.md`.
 2. Extract the lane, with its tests, and switch snowtime-native to it. Run the bar.
-3. Extract the store, transaction, and bridge behind traits for what the app supplies:
-   the lanes, the user and session hooks, and the client-address header. Move the store
-   and transaction tests with them. Run the bar and the library's compatibility harness.
-4. Extract the cookie, session check, and scrypt, with Snowtime's settings as
+3. Extract the cookie, session check, and scrypt, with Snowtime's settings as
    configuration. Run the bar.
+4. Extract the auth handlers into the compatibility crate one area at a time, behind what
+   the app supplies: execution on its lanes, its hooks, and its HTTP composition. Run the
+   bar after each area.
 5. Run the performance gate against the `5a5cb9b` baseline: extraction shouldn't change
    CPU, memory, or binary size beyond noise.
 6. Update the kit's auth recipe to point at the crates instead of snowtime-native's files.
 
 ## Acceptance criteria
 
-- [ ] The three questions answered by the maintainer and recorded.
+- [x] The three questions answered by the maintainer and recorded (2026-10-22).
 - [ ] The crates build on their own with their tests, and none depends on Snowtime, Solid,
       or Start.
 - [ ] snowtime-native uses them, and its remaining auth code is Snowtime's policy and the
