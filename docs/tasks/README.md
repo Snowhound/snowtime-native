@@ -321,7 +321,7 @@ which records the edge measurements.
   consumer (todo)
 - [42](42-hand-port-auth.md): auth back on 081.28's hand-port, with better-auth-rs and the
   fork removed, since the library cut no code and alpha.5 requires system ICU
-  (in-progress)
+  (done)
 
 Task 084 moved the TypeScript app from server functions to the same API, through one
 client module. Task 089 replaces that module's call table with routes and client functions
