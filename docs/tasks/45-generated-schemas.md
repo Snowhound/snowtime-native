@@ -61,3 +61,5 @@ The first run found two differences:
       before, with the exclusion recorded in `schema-gen.json`.
 - [x] CI checks that the generated files are current at the kit revision
       `harness/schema-gen.sh` names, and runs the differential test.
+- [x] CI passes on the merge (run 39792892580), and after subtask 46's archive (run
+      39793304153).
