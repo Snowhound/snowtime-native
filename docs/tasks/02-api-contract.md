@@ -9,7 +9,7 @@ hash of the build (`/_serverFn/<sha256>`), encodes its bodies in its own format,
 accepts calls by `Sec-Fetch-Site`, so a Rust server would have to track Start's internals
 release by release. The app had 41 server functions in 9 `*.functions.ts` files until task 084 moved them to the API.
 
-Kait, 2026-10-04: the call table task 084 added (`src/lib/api/operations.ts` with
+2026-10-04: the call table task 084 added (`src/lib/api/operations.ts` with
 `operations.server.ts`) gives way to per-domain routes and client functions (task 089 on
 `main`). The HTTP API, its paths and JSON, is the contract. The TypeScript server routes it
 with Hono and the native server with Axum (subtask 06), one routes file per domain on each
@@ -28,7 +28,7 @@ option. The design below predates this, where it speaks of one client module.
   instead of rows, as 081 question 2 lists.
 - **The adapter.** Query and mutation functions in `src/lib/queries/` and the features
   call one client module, not `*.functions.ts`. Both backends serve the API behind it,
-  and the TypeScript app drops server functions (task 084, Kait, 2026-10-03).
+  and the TypeScript app drops server functions (task 084, 2026-10-03).
   Query keys and the cached data's shape stay as they are, so components don't change.
 - **Server rendering calls in process.** In the native backend, the render isolate runs
   the app's own TanStack loaders (subtask 01). The adapter there calls a host function

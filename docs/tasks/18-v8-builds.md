@@ -69,7 +69,7 @@ with the first published Rust carriers. The canary/Bun real comparison passes ex
 Node 24/26 fail report pages because of ICU formatting differences.
 
 The first criterion stays open: the synthetic render fails calibration against 081.14,
-so its measurements are diagnostics and cannot select candidates. Kait cancelled the task
+so its measurements are diagnostics and cannot select candidates. The task was cancelled
 on 2026-10-07 on this result, since the real-bundle measurements already show no V8
 upgrade worth shipping. The benchmark harness was not merged
 ([report](server-rendering/v8-builds-wsl.md#reproduction-and-validation)).

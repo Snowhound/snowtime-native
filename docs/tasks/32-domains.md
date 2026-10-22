@@ -64,7 +64,7 @@ before its hook answers `null`.
 ## Verification
 
 2026-10-08, macOS arm64, on the uncommitted fix over `d67ba4c`. Logs:
-`/private/tmp/claude-501/-Users-kaitkasak-projects-snowtime-snowtime/96e2565a-6dc3-4223-b493-9999fea41aa1/scratchpad/v1`.
+`<scratchpad>/v1`.
 
 | Check                                                                  | Result                                                    |
 | ---------------------------------------------------------------------- | --------------------------------------------------------- |

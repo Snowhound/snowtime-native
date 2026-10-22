@@ -4,9 +4,9 @@ Status: complete for the agreed local protocol, 2026-10-06. Measurements, analys
 and required checks pass. The read pool remains opt-in (`DB_READ_CONNECTIONS=0` by
 default). Two/four-core pool cells and the dedicated-host repeat are deferred.
 
-Worktree `/private/tmp/snowtime-081-load`, branch `081-load-and-scaling`. Merge into
+Worktree `<tmp>/snowtime-081-load`, branch `081-load-and-scaling`. Merge into
 `081-native-poc` without pushing. Preserve ignored evidence and the stopped stack's
-retained M volume. Docker stays at Kait's 16-GiB setting (15.60 GiB usable, 10 vCPUs).
+retained M volume. Docker stays at the 16-GiB setting (15.60 GiB usable, 10 vCPUs).
 
 Compare the native host's API, rendered pages, and in-process TLS edge against one
 TypeScript/Bun process behind Caddy. Keep the dataset, page-inclusive recording,
@@ -237,7 +237,7 @@ Required checks pass on the final tree:
   `perf/.cache/stress/081-readonly-fixture-1791294420245/`. L's preserved `stopped/`
   archive remains untouched.
 
-Final check logs are `/private/tmp/081-*-final.log`. The benchmark stack stays stopped;
+Final check logs are `<tmp>/081-*-final.log`. The benchmark stack stays stopped;
 its retained live volume contains M. Historical L restart commands are not executed.
 
 ## Resume after the account-quota pause, 2026-10-06
@@ -245,8 +245,8 @@ its retained live volume contains M. Historical L restart commands are not execu
 This handover is completed by the final analysis and checks above. Its remaining-work
 list records the pause state, not further restart instructions.
 
-Kait requests a handover after the running measurements finish. The focused M driver
-exits successfully after its final 65k pooled hold. All focused M/L measurements,
+The maintainer requests a handover after the running measurements finish. The focused M
+driver exits successfully after its final 65k pooled hold. All focused M/L measurements,
 one-core fixed/kind controls, L's prepared TypeScript comparison, and L restore
 verification are complete. No new load run is required by the agreed protocol.
 Two/four-core pool cells remain deferred.
@@ -261,8 +261,8 @@ Unrelated services remain running. Docker stays at 16 GiB; production's Litestre
 
 The pause artifact is `perf/.cache/stress/081-quota-pause-1791293602090/`. It preserves
 before/after container inspection, service logs, transaction/UTC state, a stopped M
-DB/WAL/SHM snapshot, and table counts. Phase logs are `/private/tmp/081-focused-M.log`
-and `/private/tmp/081-focused-L-resume.log`. The matrices are
+DB/WAL/SHM snapshot, and table counts. Phase logs are `<tmp>/081-focused-M.log`
+and `<tmp>/081-focused-L-resume.log`. The matrices are
 `perf/.cache/stress/081-focused-matrix.json` and the preserved original single matrix.
 `081-baseline-preservation.json` verifies that the original matrices remain unchanged.
 
@@ -297,9 +297,9 @@ of a completed child's capacity after temporarily omitting its matrix row. Evide
 
 Remaining work:
 
-1. Finish the analysis and final task status. `/private/tmp/081-analyze.py` now includes
+1. Finish the analysis and final task status. `<tmp>/081-analyze.py` now includes
    all completed focused cells and correct error types. Its refreshed output is
-   `perf/.cache/stress/081-analysis.json`; `/private/tmp/081-analysis-final.log` records
+   `perf/.cache/stress/081-analysis.json`; `<tmp>/081-analysis-final.log` records
    its summary. Complete matched per-call/page latency, CPU-kind/timing, per-core
    efficiency, worker bounds, WAL/checkpoint, whole-host memory advice, and bottleneck
    costs. Keep cache/clock/replication caveats and the shared-VM limitation. M/L eight-core
@@ -323,8 +323,8 @@ Remaining work:
    Default native conformance covers the ported timer suite; broader unported domains'
    404s are outside this POC. The prior checks recorded below predate this continuation.
 4. Commit in `081-load-and-scaling`, then merge into `081-native-poc` at
-   `/Users/kaitkasak/projects/snowtime/snowtime-081-poc`. Preserve its task 11/12 and task
-   05 documentation and task-index changes. `/private/tmp/081-target-docs.json` has hashes
+   `<repo>`. Preserve its task 11/12 and task
+   05 documentation and task-index changes. `<tmp>/081-target-docs.json` has hashes
    for the protected task files. The target is clean at handover. Commit and merge remain
    authorized. Do not push, remove the worktree, or delete ignored evidence or volumes.
 
@@ -338,7 +338,7 @@ restore or clear metadata merely to run a prepared control.
 This sequence is completed. The live volume now holds M; retain these instructions
 as the L phase's historical handoff, not the next session's restart procedure.
 
-Kait set a 13:00 Europe/Tallinn (10:00 UTC) pause deadline and requested a restart
+The maintainer set a 13:00 Europe/Tallinn (10:00 UTC) pause deadline and requested a restart
 prompt for a cleared session. Continue the focused analytical protocol below, not
 the original exhaustive pool matrix. All changes remain uncommitted. Merge and final
 checks remain authorized after the remaining work; do not push.
@@ -379,7 +379,7 @@ checks remain authorized after the remaining work; do not push.
    contemporaneous controls where attribution matters; never rewrite pinned sources.
 7. Complete latency/per-call CPU, reader memory, bounded-worker, WAL/checkpoint,
    Litestream, and whole-host memory analysis; resolve the read-pool default (still 0).
-   The ignored helper `/private/tmp/081-analyze.py` now reads the single, pool, and
+   The ignored helper `<tmp>/081-analyze.py` now reads the single, pool, and
    focused matrices and writes `perf/.cache/stress/081-analysis.json`. It is an analysis
    aid, not a required repository tool. Prepared process RSS and cgroup memory have
    different cache accounting; retain the shared-VM/page-cache caveat in host advice.
@@ -389,12 +389,12 @@ checks remain authorized after the remaining work; do not push.
    timer-view “starts after today's last entry” test. Default conformance covers the
    ported timer suite; the unported domains' 404s are outside this POC.
 9. Commit and merge into `081-native-poc` in
-   `/Users/kaitkasak/projects/snowtime/snowtime-081-poc`. Preserve its task 11/12 and
+   `<repo>`. Preserve its task 11/12 and
    other documentation changes. Do not push or remove this worktree or ignored data.
 
 Completed raw measurements and the exact pause checkpoint are recorded below. The
-focused phase log is `/private/tmp/081-focused-L.log`; original L baseline log is
-`/private/tmp/081-L-single-resume.log`. The full-matrix launcher was intentionally
+focused phase log is `<tmp>/081-focused-L.log`; original L baseline log is
+`<tmp>/081-L-single-resume.log`. The full-matrix launcher was intentionally
 stopped after native's eight-core child completed; all original M rows are intact.
 
 ## Machine and run protocol
@@ -402,11 +402,11 @@ stopped after native's eight-core child completed; all original M rows are intac
 The Mac has 32 GiB RAM and 10 physical cores: eight performance cores and two efficiency
 cores (`sysctl hw.memsize hw.ncpu hw.perflevel0.physicalcpu
 hw.perflevel1.physicalcpu`). Docker Desktop exposed 10 vCPUs and
-8,319,504,384 bytes (7.75 GiB) RAM for the first runs. Kait increased it to 16 GiB on
-resume; verified usable memory is 16,745,824,256 bytes (15.60 GiB). The 8-core app limit
-and k6 share this VM, so monitor actual memory rather than adding nominal limits. Confirm how the
-VM schedules performance and efficiency cores; a Linux cpuset does not prove physical
-performance-core affinity on macOS.
+8,319,504,384 bytes (7.75 GiB) RAM for the first runs. The maintainer increased it to
+16 GiB on resume; verified usable memory is 16,745,824,256 bytes (15.60 GiB). The 8-core
+app limit and k6 share this VM, so monitor actual memory rather than adding nominal limits.
+Confirm how the VM schedules performance and efficiency cores; a Linux cpuset does not
+prove physical performance-core affinity on macOS.
 
 The first pair uses core 1 for the app, Caddy, sampler, and Litestream. k6 has cores
 2–9. The shared guard in `perf/stress/lock.ts` reserves the stack and checks competing
@@ -462,13 +462,13 @@ fixed load does not establish capacity. No ramp or pool gain has been measured y
 The benchmark containers are stopped, and the shared reservation is released.
 
 Raw folders follow the existing timestamp/dataset/run/label convention in
-`/private/tmp/snowtime-081-load/perf/.cache/stress/runs/`:
+`<tmp>/snowtime-081-load/perf/.cache/stress/runs/`:
 
 - `2026-10-05T04-15-08-M-fixed-081-load-ts-single-1c-fixed40k`
 - `2026-10-05T04-29-26-M-fixed-081-load-native-single-1c-fixed40k`
 
-Logs are `/private/tmp/081-first-{ts,native}.log`; build logs are
-`/private/tmp/081-{ts,native,caddy,sampler}-image.log`. Preserve image digests, settings,
+Logs are `<tmp>/081-first-{ts,native}.log`; build logs are
+`<tmp>/081-{ts,native,caddy,sampler}-image.log`. Preserve image digests, settings,
 idle readings, step samples, summaries, and replication logs with the raw run folder.
 
 ### Native diagnostic result
@@ -636,7 +636,7 @@ The no-replication 40k control remains available for that pair.
 
 Resume sequence (updated 2026-10-06):
 
-1. Continue in `/private/tmp/snowtime-081-load`, branch `081-load-and-scaling`.
+1. Continue in `<tmp>/snowtime-081-load`, branch `081-load-and-scaling`.
    All implementation and documentation changes remain uncommitted. Preserve the
    ignored datasets, replicas, and raw runs in this worktree.
 2. Confirm the Mac is idle, Docker still has 16 GiB, and the shared stress lock has
@@ -658,7 +658,7 @@ Resume sequence (updated 2026-10-06):
    Preserve source hashes and document or control this difference, plus page-date changes.
 7. Finish large-dataset restore verification, diagnostics, memory recommendations,
    and measured bottleneck proposals. Run the required checks, commit, and merge into
-   `081-native-poc` in `/Users/kaitkasak/projects/snowtime/snowtime-081-poc`.
+   `081-native-poc` in `<repo>`.
    Preserve its task 11/12 documentation changes. Do not push.
 
 The latest native image, `7387139d1c5f05826689c0bcc2dfcc9a0c3a36779d1f050fdc19bb8eeee6d627`,
@@ -684,13 +684,13 @@ and drops no actions. WAL growth coincides with degradation; the ramp also mutat
 timer entries, so the fixed fresh-dataset controls must isolate the cause.
 
 Raw folder: `2026-10-05T16-28-35-M-ramp-081-load-native-single-1c-ramp`.
-The lower-start repeat is interrupted when Kait selects a checkpoint-capable release
-for the full matrix. Preserve completed steps, exclude the interrupted step and any
-capacity claim. Raw folder:
+The lower-start repeat is interrupted when the maintainer selects a checkpoint-capable
+release for the full matrix. Preserve completed steps, exclude the interrupted step and
+any capacity claim. Raw folder:
 `2026-10-05T16-44-35-M-ramp-081-load-native-single-1c-ramp`.
 
-Kait selects the tested checkpoint-capable release for the full matrix (2026-10-05).
-The matched diagnostic compares no replication, Litestream 0.5.0, and 0.5.15
+The maintainer selects the tested checkpoint-capable release for the full matrix
+(2026-10-05). The matched diagnostic compares no replication, Litestream 0.5.0, and 0.5.15
 under the same fresh M/40k/120-second offer and 1,536-MiB app limit. Checkpoint
 progress, WAL bounds, and replica restore verification pass for 0.5.15.
 Production deployment files retain their existing version and settings. Matrix labels
@@ -1061,8 +1061,8 @@ phases rather than modifying the preserved datasets.
 
 ### Focused protocol, agreed on 2026-10-06
 
-Kait asked to optimize for the analytical questions rather than complete every cell
-in the original runner. Finish the current native eight-core L baseline, then pair
+The maintainer asked to optimize for the analytical questions rather than complete every
+cell in the original runner. Finish the current native eight-core L baseline, then pair
 single and pooled native measurements at one and eight cores for L and M. Intermediate
 two/four-core pool cells are deferred. Preserve every earlier baseline and raw folder.
 The automatic matrix launcher is paused while its current child finishes.
@@ -1188,7 +1188,7 @@ first measured window; inspect replication CPU/logs and allow it to settle.
 The next session must still perform L restore verification, the focused M phase,
 final analysis/default decision, required checks, commit, and merge. The Hetzner
 repeat instructions are expanded, but that deployment protocol is unexecuted;
-Kait provisions its machines.
+The maintainer provisions its machines.
 
 ## Fourth resume, 2026-10-06
 
@@ -1628,7 +1628,7 @@ production Litestream version change belongs to this completed local measurement
 
 ## Repeat on Hetzner
 
-Kait provisions a dedicated-CPU app server and a separate k6 machine on the same
+The maintainer provisions a dedicated-CPU app server and a separate k6 machine on the same
 network. This work provisions nothing. Follow `perf/README.md`'s remote deployment
 instructions, using the same dataset files and recording from this worktree.
 

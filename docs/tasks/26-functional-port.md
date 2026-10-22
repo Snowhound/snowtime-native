@@ -23,8 +23,8 @@ verification pattern. The TypeScript server remains the source of truth.
       order, messages, and absent, null, and present field behavior
 - [x] Settings conformance passes; comparison covers valid and malformed input,
       owner and member writes, signed-out refusals, and unchanged state after refusal
-- [x] Stop after this step and give Kait the commit range, verification counts, and
-      commands to run both apps on localhost with separate seeded database copies
+- [x] Stop after this step and give the maintainer the commit range, verification counts,
+      and commands to run both apps on localhost with separate seeded database copies
 
 ### 3. Project writes
 
@@ -63,12 +63,12 @@ verification pattern. The TypeScript server remains the source of truth.
 
 ## Porting notes
 
-Read each TypeScript domain before porting it. Preserve its behavior; ask Kait if a
-rule appears wrong. A determinism fix can change TypeScript behavior only with a
+Read each TypeScript domain before porting it. Preserve its behavior; ask the maintainer
+if a rule appears wrong. A determinism fix can change TypeScript behavior only with a
 recorded architecture decision, as subtask 24's explicit `en-US` collation does.
 
 No Docker, load runs, or stress runs. Work on a separate branch; don't push, rebase,
-or merge without Kait's approval.
+or merge without the maintainer's approval.
 
 Patterns for subtask 05:
 
@@ -104,10 +104,11 @@ Patterns for subtask 05:
 
 ### Step 5
 
-Verified on Ubuntu x64 in WSL on 2026-10-08. Kait approved fixing TypeScript's invitation
-limit to count all live pending rows. Both servers now enforce it. The earlier partial
-commit recorded 877 equal calls and one limit mismatch; Kait authorized that partial push.
-The temporary handoff is removed after the completed verification below.
+Verified on Ubuntu x64 in WSL on 2026-10-08. The maintainer approved fixing TypeScript's
+invitation limit to count all live pending rows. Both servers now enforce it. The earlier
+partial commit recorded 877 equal calls and one limit mismatch; the maintainer authorized
+that partial push. The temporary handoff is removed after the completed verification
+below.
 
 - `cargo fmt` and both workspace Clippy configurations pass.
 - Server tests: 63 pass without `bench`, and 63 with it. Host tests: 15 pass.
@@ -205,9 +206,9 @@ Verified on Ubuntu x64 in WSL on 2026-10-08:
 - Archive comparisons mask `archivedAt`, another value of each server's advancing
   clock. Repeated-archive stability is checked directly in Rust and conformance.
 - Empty project PATCH originally raised Drizzle's "No values to set" and HTTP 500.
-  Kait authorized a successful no-op in both servers on 2026-10-08. Both check admin
-  access and existence first, then return the existing project without audit changes.
-  The TypeScript regression test and `docs/architecture/data.md` record this fix.
+  The maintainer authorized a successful no-op in both servers on 2026-10-08. Both check
+  admin access and existence first, then return the existing project without audit
+  changes. The TypeScript regression test and `docs/architecture/data.md` record this fix.
 - Project deletion uses a transaction for the entry check, assignment removal, and
   logical delete. A refusal rolls back the assignment removal. Audit actors stay explicit.
 - The native README records environment-only configuration and dotenv loading as a
@@ -266,7 +267,8 @@ Verified on Ubuntu x64 in WSL on 2026-10-07:
 
 Saved outputs are in [functional-port/step2](functional-port/step2/).
 Steps 1–2 changed no TypeScript server behavior. No Docker, load runs, stress runs, or
-native Windows builds were used. Kait reviewed these steps and resumed on 2026-10-08.
+native Windows builds were used. The maintainer reviewed these steps and resumed on
+2026-10-08.
 
 ## Line counts
 

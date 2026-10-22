@@ -2,12 +2,12 @@
 
 Status: done
 
-Kait reviewed and approved step 4 on 2026-10-08. All four steps are complete.
+The maintainer reviewed and approved step 4 on 2026-10-08. All four steps are complete.
 
 Close the functional gaps so a native-only host serves every call the app makes.
 TypeScript and installed Better Auth 1.7.7 remain the source of truth. Follow
 [081.26](26-functional-port.md). Work on `081-auth-port`, from `081-native-poc` at
-`6e8a18b`, in `/private/tmp/snowtime-081-auth-port`.
+`6e8a18b`, in `<tmp>/snowtime-081-auth-port`.
 
 ## Steps and acceptance criteria
 
@@ -17,8 +17,8 @@ TypeScript and installed Better Auth 1.7.7 remain the source of truth. Follow
    - [x] Run invitation conformance without the acceptance exclusion.
    - [x] Compare fresh database copies, including success, optional team assignment,
          wrong recipient, expired, canceled, and already-member cases.
-   - [x] Stop after step 1. Give Kait the commit range, verification counts, and commands
-         for two local hosts with separate seeded database copies.
+   - [x] Stop after step 1. Give the maintainer the commit range, verification counts, and
+         commands for two local hosts with separate seeded database copies.
 2. Passkeys:
    - [x] Port registration, sign-in, listing, and removal as the app uses them.
    - [x] Start from [the auth spike](auth-spike.md), branch `081-auth-spike`; record
@@ -27,14 +27,14 @@ TypeScript and installed Better Auth 1.7.7 remain the source of truth. Follow
    - [x] Match Better Auth's state, PKCE, callback, and account-linking behavior.
    - [x] Use a local fake provider for both comparison servers; record what it cannot prove.
 4. Remaining client calls:
-   - [x] Show Kait the audited missing-route list below before porting this step.
+   - [x] Show the maintainer the audited missing-route list below before porting this step.
    - [x] Port every remaining organization write and profile update in that list.
 
 For every step:
 
 - [x] Read the TypeScript domain and installed Better Auth source before porting.
-      Ask Kait about suspect rules. A TypeScript behavior change requires a decision
-      in `docs/architecture/`; don't change it silently.
+      Ask the maintainer about suspect rules. A TypeScript behavior change requires a
+      decision in `docs/architecture/`; don't change it silently.
 - [x] Put routes in the domain's `routes.rs`, with one rule call per handler.
       Validate in Valibot or Zod order, with matching messages, before deserialization.
 - [x] Add byte-equal comparisons to `native/bench/compare.ts`, conformance in
@@ -47,7 +47,8 @@ For every step:
 - [x] Record counts and save output under `auth-port/stepN/` here. Update the ported
       and not-ported list in `native/README.md` and the Open notes in subtask 01.
 
-No Docker, load, or stress runs. Don't push, rebase, or merge without Kait's approval.
+No Docker, load, or stress runs. Don't push, rebase, or merge without the maintainer's
+approval.
 
 ## Missing-route audit
 
@@ -94,12 +95,12 @@ production calls to reject invitations, leave/delete organizations, or update pa
 ### Step 1
 
 Verified on macOS arm64 on 2026-10-08. At completion of step 1, steps 2–4 were pending.
-Kait approved fixing the TypeScript already-member crash with the recorded option 2
-in [the auth decision](../../app/docs/architecture/auth.md#invitation-acceptance-after-joining).
+The maintainer approved fixing the TypeScript already-member crash with the recorded
+option 2 in [the auth decision](../../app/docs/architecture/auth.md#invitation-acceptance-after-joining).
 The scope commit is `2583c0c`; the isolated TypeScript fix is `1222cf2`, and the native
-implementation is `1397ee5`. Kait reviewed and approved applying the TypeScript fix to
-`main`, where it is committed as `c0e7d43`. The transplant preserves `main`'s existing
-invitation-limit code and includes no native changes.
+implementation is `1397ee5`. The maintainer reviewed and approved applying the TypeScript
+fix to `main`, where it is committed as `c0e7d43`. The transplant preserves `main`'s
+existing invitation-limit code and includes no native changes.
 
 - `cargo fmt` and workspace Clippy, both without and with `bench`, pass.
 - Server tests: 66 pass without `bench`, and 66 with it. Host tests: 16 pass.
@@ -175,10 +176,10 @@ The spike still documents its earlier target version; crate adoption belongs to 
 ### Step 2
 
 Verified on macOS arm64 on 2026-10-08. Passkey registration, sign-in, listing, and removal
-are implemented. Kait approved step 1 and asked to stop after step 2. Google/OAuth and
-remaining organization/profile writes remain pending. No TypeScript auth behavior changes.
-The requested seed import correction is `b7c2349` on `main` and `dbad70a` on
-`081-auth-port`.
+are implemented. The maintainer approved step 1 and asked to stop after step 2.
+Google/OAuth and remaining organization/profile writes remain pending. No TypeScript auth
+behavior changes. The requested seed import correction is `b7c2349` on `main` and
+`dbad70a` on `081-auth-port`.
 
 Read the app's auth configuration, settings mutations, sign-in action, installed
 `@better-auth/passkey` 1.7.7 server/client, and `@simplewebauthn/server` 13.3.3 before
@@ -272,14 +273,15 @@ sequentially: their builds replace the same harness cache. The final `*-client-s
 outputs check the response shape with `clientExtensionResults` omitted. No Docker,
 load, or stress runs.
 
-Kait reviewed and approved step 2 on 2026-10-08. Manual registration, sign-in, and removal
-passed with a macOS fingerprint passkey on separate accounts on both hosts.
+The maintainer reviewed and approved step 2 on 2026-10-08. Manual registration, sign-in,
+and removal passed with a macOS fingerprint passkey on separate accounts on both hosts.
 
 ### Step 3
 
-Verified on macOS arm64 on 2026-10-08. Kait approved passkeys and asked to stop after
-Google/OAuth. The app's Google, GitHub, and Microsoft redirect flows and account management
-are ported. Step 4 remains pending. No TypeScript authentication behavior changes.
+Verified on macOS arm64 on 2026-10-08. The maintainer approved passkeys and asked to stop
+after Google/OAuth. The app's Google, GitHub, and Microsoft redirect flows and account
+management are ported. Step 4 remains pending. No TypeScript authentication behavior
+changes.
 
 Read `better-auth.server.ts`, `sign-in.server.ts`, login-domain and name hooks, the client's
 sign-in/settings calls, and the installed Better Auth 1.7.7 social sign-in, callback,
@@ -389,10 +391,10 @@ providers share the native profile rule.
 
 ### Step 4
 
-Verified on macOS arm64 on 2026-10-08. Kait approved the missing-route list and asked to
-stop after step 4. All eight remaining client calls are ported. The native leave route
-also supports the requested malformed-body comparison and shares member-removal cleanup.
-No schema or migration changes.
+Verified on macOS arm64 on 2026-10-08. The maintainer approved the missing-route list and
+asked to stop after step 4. All eight remaining client calls are ported. The native leave
+route also supports the requested malformed-body comparison and shares member-removal
+cleanup. No schema or migration changes.
 
 Read the client's profile and organization calls, Snowtime's name, login-domain, and
 member-removal hooks, and installed Better Auth 1.7.7 organization routes, adapter,
@@ -402,9 +404,9 @@ organization caps, active-organization changes, duplicate roles, response field 
 and metadata encoding follow TypeScript. At step 4, an update with no recognized organization fields retained TypeScript's empty
 HTTP 500 response. [Task 081.29](29-hardening.md) corrects both backends to return 400.
 
-Kait requested an isolated TypeScript bug fix for `memberRemovalHook`: act only when the
-returned member or leave result has string `userId` and `organizationId` fields. Better
-Auth can pass validation responses to this hook as objects rather than `APIError`s.
+The maintainer requested an isolated TypeScript bug fix for `memberRemovalHook`: act only
+when the returned member or leave result has string `userId` and `organizationId` fields.
+Better Auth can pass validation responses to this hook as objects rather than `APIError`s.
 The old hook sent undefined IDs to SQL and turned malformed removal bodies into empty
 HTTP 500s. The fix is `b8d93c8`, with a regression for signed-in and signed-out
 malformed bodies on both removal paths. It contains no native code or architecture change
@@ -508,22 +510,22 @@ cargo build --manifest-path native/Cargo.toml -p snowtime-host --offline
 In one terminal:
 
 ```sh
-cd /private/tmp/snowtime-081-auth-port
+cd <tmp>/snowtime-081-auth-port
 NODE_ENV=development HOST=127.0.0.1 PORT=3100 \
   BETTER_AUTH_SECRET=localhost-review-secret-081-auth-port \
   BETTER_AUTH_URL=http://localhost:3100 \
-  TURSO_DATABASE_URL=file:/private/tmp/snowtime-081-auth-port/perf/.cache/auth-review-ts.db \
+  TURSO_DATABASE_URL=file:<tmp>/snowtime-081-auth-port/perf/.cache/auth-review-ts.db \
   bun .output/server/index.mjs
 ```
 
 In another:
 
 ```sh
-cd /private/tmp/snowtime-081-auth-port
+cd <tmp>/snowtime-081-auth-port
 NODE_ENV=development HOST=127.0.0.1 PORT=3200 RENDERERS=1 \
   BETTER_AUTH_SECRET=localhost-review-secret-081-auth-port \
   BETTER_AUTH_URL=http://127.0.0.1:3200 \
-  TURSO_DATABASE_URL=file:/private/tmp/snowtime-081-auth-port/perf/.cache/auth-review-native.db \
+  TURSO_DATABASE_URL=file:<tmp>/snowtime-081-auth-port/perf/.cache/auth-review-native.db \
   EDGE_STATIC_DIR=native/crates/render/bundle/dist/public \
   native/target/debug/snowtime-axum
 ```
@@ -545,11 +547,11 @@ for both hosts, with separate browser profiles to keep their cookies apart. Stop
 acceptance-review native host and restart it with its URL changed to `localhost`:
 
 ```sh
-cd /private/tmp/snowtime-081-auth-port
+cd <tmp>/snowtime-081-auth-port
 NODE_ENV=development HOST=127.0.0.1 PORT=3200 RENDERERS=1 \
   BETTER_AUTH_SECRET=localhost-review-secret-081-auth-port \
   BETTER_AUTH_URL=http://localhost:3200 \
-  TURSO_DATABASE_URL=file:/private/tmp/snowtime-081-auth-port/perf/.cache/auth-review-native.db \
+  TURSO_DATABASE_URL=file:<tmp>/snowtime-081-auth-port/perf/.cache/auth-review-native.db \
   EDGE_STATIC_DIR=native/crates/render/bundle/dist/public \
   native/target/debug/snowtime-axum
 ```

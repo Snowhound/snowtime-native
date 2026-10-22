@@ -33,7 +33,7 @@ params: 01a11b0d-a2b1-7022-a6c6-6bbf6c0aed92,01900000-0000-7000-8000-00000000020
   "member", 1791455240881
 ],
 
-      at <anonymous> (/Users/kaitkasak/projects/snowtime/snowtime-081-poc/node_modules/drizzle-orm/sqlite-core/async/session.js:99:10)
+      at <anonymous> (<repo>/node_modules/drizzle-orm/sqlite-core/async/session.js:99:10)
 
 648 | }
 649 | function mapSqliteError(e) {
@@ -47,10 +47,10 @@ LibsqlError: SQLITE_CONSTRAINT: UNIQUE constraint failed: member.organization_id
     rawCode: 2067,
        code: "SQLITE_CONSTRAINT"
 
-      at mapSqliteError (/Users/kaitkasak/projects/snowtime/snowtime-081-poc/node_modules/@libsql/client/lib-esm/sqlite3.js:653:16)
-      at executeStmt (/Users/kaitkasak/projects/snowtime/snowtime-081-poc/node_modules/@libsql/client/lib-esm/sqlite3.js:556:15)
-      at execute (/Users/kaitkasak/projects/snowtime/snowtime-081-poc/node_modules/@libsql/client/lib-esm/sqlite3.js:245:20)
-      at async inTurn (/private/tmp/snowtime-081-auth-port/src/db/connection.ts:36:20)
+      at mapSqliteError (<repo>/node_modules/@libsql/client/lib-esm/sqlite3.js:653:16)
+      at executeStmt (<repo>/node_modules/@libsql/client/lib-esm/sqlite3.js:556:15)
+      at execute (<repo>/node_modules/@libsql/client/lib-esm/sqlite3.js:245:20)
+      at async inTurn (<tmp>/snowtime-081-auth-port/src/db/connection.ts:36:20)
 
 # SERVER_ERROR:  94 | 			}
 95 | 			if (!mapper) return res;
@@ -67,7 +67,7 @@ params: 01a11b0d-a2b1-7022-a6c6-6bbf6c0aed92,01900000-0000-7000-8000-00000000020
   "member", 1791455240881
 ],
 
-      at <anonymous> (/Users/kaitkasak/projects/snowtime/snowtime-081-poc/node_modules/drizzle-orm/sqlite-core/async/session.js:99:10)
+      at <anonymous> (<repo>/node_modules/drizzle-orm/sqlite-core/async/session.js:99:10)
 
 648 | }
 649 | function mapSqliteError(e) {
@@ -81,10 +81,10 @@ LibsqlError: SQLITE_CONSTRAINT: UNIQUE constraint failed: member.organization_id
     rawCode: 2067,
        code: "SQLITE_CONSTRAINT"
 
-      at mapSqliteError (/Users/kaitkasak/projects/snowtime/snowtime-081-poc/node_modules/@libsql/client/lib-esm/sqlite3.js:653:16)
-      at executeStmt (/Users/kaitkasak/projects/snowtime/snowtime-081-poc/node_modules/@libsql/client/lib-esm/sqlite3.js:556:15)
-      at execute (/Users/kaitkasak/projects/snowtime/snowtime-081-poc/node_modules/@libsql/client/lib-esm/sqlite3.js:245:20)
-      at async inTurn (/private/tmp/snowtime-081-auth-port/src/db/connection.ts:36:20)
+      at mapSqliteError (<repo>/node_modules/@libsql/client/lib-esm/sqlite3.js:653:16)
+      at executeStmt (<repo>/node_modules/@libsql/client/lib-esm/sqlite3.js:556:15)
+      at execute (<repo>/node_modules/@libsql/client/lib-esm/sqlite3.js:245:20)
+      at async inTurn (<tmp>/snowtime-081-auth-port/src/db/connection.ts:36:20)
 
 (pass) regression: a recipient who joined after the invitation hits the unique membership index [198.99ms]
 (pass) acceptance reuses a membership, preserves its role, applies the team, and closes the link [194.18ms]

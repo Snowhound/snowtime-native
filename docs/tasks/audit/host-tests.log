@@ -1,5 +1,5 @@
-   Compiling snowtime-render v0.1.0 (/Users/kaitkasak/projects/snowtime/snowtime-081-poc/native/crates/render)
-   Compiling snowtime-host v0.1.0 (/Users/kaitkasak/projects/snowtime/snowtime-081-poc/native/crates/host)
+   Compiling snowtime-render v0.1.0 (<repo>/native/crates/render)
+   Compiling snowtime-host v0.1.0 (<repo>/native/crates/host)
     Finished `test` profile [unoptimized + debuginfo] target(s) in 3.77s
      Running unittests src/main.rs (native/target/debug/deps/snowtime_axum-d28ed6ff5887083a)
 

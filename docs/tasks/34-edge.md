@@ -3,7 +3,7 @@
 Status: done
 
 Fix H3, M4, M6, M11, L2, and L18 from task 081.30 on branch `081-edge`, from `081-audit`
-at `d67ba4c`, and build the M6 design Kait decided on 2026-10-08. No Docker, load, or
+at `d67ba4c`, and build the M6 design decided on 2026-10-08. No Docker, load, or
 stress runs: M6 has no load evidence, so tests and source tests show it.
 
 ## Acceptance criteria

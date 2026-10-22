@@ -2,7 +2,7 @@
 
 Status: done (2026-10-07)
 
-V8 in the host is the render engine (Kait, 2026-10-07), and Kait wants the app's renders
+V8 in the host is the render engine (2026-10-07), and the maintainer wants the app's renders
 as fast as reasonably possible. After [task 081.22](22-render-follow-ups.md), V8's shared
 bundle is 1.21 times Bun's plain bundle on the timer, but 1.27 on month and 1.29 on year
 ([report](server-rendering/hot-spots-mac.md#task-08122s-follow-ups)). Their remaining gap
@@ -45,7 +45,7 @@ container, with the render crate's recorded answers (`native/crates/render/READM
   CPU-heavy alongside and never compare absolute numbers across sessions.
 - Compare HTML with the plain bundle built the same way on the same engine. The bundle is
   minified, so serialized function sources differ between V8 and Bun.
-- Kait's ignored helper scripts on this machine do the above:
+- Ignored helper scripts on this machine do the above:
   `native/crates/render/results/q21/scripts/` (`build.sh`, `quick.sh` with `PAGES`,
   `prof.sh`, `psum.py`, `callers.py`, `checks.sh`, `full22.sh`).
 

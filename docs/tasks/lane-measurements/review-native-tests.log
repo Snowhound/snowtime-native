@@ -1,6 +1,6 @@
-   Compiling snowtime-render v0.1.0 (/Users/kaitkasak/projects/snowtime/snowtime-081-lanes/native/crates/render)
-   Compiling snowtime-server v0.1.0 (/Users/kaitkasak/projects/snowtime/snowtime-081-lanes/native/crates/server)
-   Compiling snowtime-host v0.1.0 (/Users/kaitkasak/projects/snowtime/snowtime-081-lanes/native/crates/host)
+   Compiling snowtime-render v0.1.0 (<checkouts>/snowtime-081-lanes/native/crates/render)
+   Compiling snowtime-server v0.1.0 (<checkouts>/snowtime-081-lanes/native/crates/server)
+   Compiling snowtime-host v0.1.0 (<checkouts>/snowtime-081-lanes/native/crates/host)
     Finished `test` profile [unoptimized + debuginfo] target(s) in 5.12s
      Running unittests src/main.rs (native/target/debug/deps/snowtime_axum-714bfcc160f23600)
 
@@ -162,8 +162,8 @@ test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fin
    Doc-tests snowtime_render
 
 running 2 tests
-test /Users/kaitkasak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deno_core-0.405.0/extensions.rs - extensions::encoding::encoding_ops (line 483) ... ignored
-test /Users/kaitkasak/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deno_core-0.405.0/extensions.rs - host (line 483) ... ignored
+test ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deno_core-0.405.0/extensions.rs - extensions::encoding::encoding_ops (line 483) ... ignored
+test ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/deno_core-0.405.0/extensions.rs - host (line 483) ... ignored
 
 test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
 

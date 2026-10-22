@@ -58,8 +58,8 @@ LGPL-2.1, and the host binary links it: `nm` on the debug binary shows `glibc_si
 `glibc_cos`, and `__branred`. 081.30's "no GPL, LGPL, or AGPL in the release graph"
 covered only the Cargo graph.
 
-LGPL-2.1's terms apply when a binary goes to someone else, not when it runs. Kait decided
-on 2026-10-09 that the notices are enough, with two additions:
+LGPL-2.1's terms apply when a binary goes to someone else, not when it runs. The
+maintainer decided on 2026-10-09 that the notices are enough, with two additions:
 
 - `THIRD_PARTY_LICENSES` links the glibc code's source at the V8 revision the locked v8
   crate pins, and says how to relink: build from source with `RUSTY_V8_ARCHIVE` set to a

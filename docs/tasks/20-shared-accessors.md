@@ -84,10 +84,10 @@ plain bundle and task 081.19's variant.
 
 ## Closing the engine gap
 
-Kait wants the embedded V8 renderer good enough that the Bun sidecar stays optional, so
-Snowtime can ship as one self-contained binary, for example on embedded systems. On task
-081.19's numbers, plain Bun renders each page in 60–65% of V8's best CPU time (timer
-11.1 ms against 17.3 ms).
+The maintainer wants the embedded V8 renderer good enough that the Bun sidecar stays
+optional, so Snowtime can ship as one self-contained binary, for example on embedded
+systems. On task 081.19's numbers, plain Bun renders each page in 60–65% of V8's best CPU
+time (timer 11.1 ms against 17.3 ms).
 
 If the measurements above leave V8's best bundle more than 1.2 times Bun's plain bundle in
 render CPU on any page, profile V8 again and try further changes. This part is for a

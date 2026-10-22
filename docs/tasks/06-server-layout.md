@@ -10,7 +10,7 @@ server the same shape, so a change on one side maps file for file onto the other
 
 ## Decided
 
-Kait, 2026-10-04:
+2026-10-04:
 
 - **Axum.** Actix Web stayed an option until subtask 01's render isolate (deno_core
   with V8) ran in the host; subtask 01 confirmed Axum on 2026-10-04. Axum and Actix measured the same CPU and memory in subtask 03.

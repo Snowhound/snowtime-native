@@ -1,4 +1,4 @@
-   Compiling snowtime-server v0.1.0 (/Users/kaitkasak/projects/snowtime/snowtime-081-report-reads/native/crates/server)
+   Compiling snowtime-server v0.1.0 (<checkouts>/snowtime-081-report-reads/native/crates/server)
     Finished `test` profile [unoptimized + debuginfo] target(s) in 1.27s
      Running unittests src/lib.rs (native/target/debug/deps/snowtime_server-d0eee4163ee489a5)
 

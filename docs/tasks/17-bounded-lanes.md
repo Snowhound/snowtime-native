@@ -4,8 +4,8 @@ Status: done
 
 Bring the database, password hashing, and V8 render lanes up to the contract in
 [native-host.md](../../docs/architecture/native-host.md), and build the overload policy
-and the client's handling of refusal that Kait chose on 2026-10-06. Subtask 10's gates
-(`native/crates/server/src/admission.rs`) cap blocking threads and refuse after
+and the client's handling of refusal that the maintainer chose on 2026-10-06. Subtask 10's
+gates (`native/crates/server/src/admission.rs`) cap blocking threads and refuse after
 `WORK_QUEUE_TIMEOUT_MS`. They admit reads and writes through one gate, bound waiting by
 time only (117 callers waited in a passing eight-core hold), and share Tokio's blocking
 pool with hashing. The V8 pool checks its queue deadline only at dequeue and has no
@@ -71,14 +71,15 @@ tests only; nothing was measured.
 - Database: the writer's gate has one slot, so single-connection mode admits one call
   at a time where `DB_CONCURRENCY` admitted two. `DB_CONCURRENCY` is gone, and the
   blocking thread cap is the readers plus one plus `SCRYPT_CONCURRENCY`. The M and L
-  repeats must check that the single-connection offer holds. Kait chose on 2026-10-06
-  that a reader renewing or deleting a session takes the writer only if its gate is free
-  at once, and otherwise leaves it to a later request. Renewals cluster at the start of
-  the working day, when the writer is busiest, and waiting for it held readers idle.
+  repeats must check that the single-connection offer holds. The maintainer chose on
+  2026-10-06 that a reader renewing or deleting a session takes the writer only if its
+  gate is free at once, and otherwise leaves it to a later request. Renewals cluster at
+  the start of the working day, when the writer is busiest, and waiting for it held
+  readers idle.
 - Rendering: the pool keeps its own queue, so a caller withdraws its page on timeout or
   drop. The restart budget defaults to 5 panics in 60 seconds (`Policy`), unmeasured.
 - Health: `/livez` and `/readyz` on the host, outside `/api/v1`.
-- Readers: Kait made `DB_READ_CONNECTIONS=auto` the default on 2026-10-06, and `auto` now
+- Readers: `DB_READ_CONNECTIONS=auto` became the default on 2026-10-06, and `auto` now
   opens no readers on one core and one per core above that. The measurements here
   should confirm both with the split gates.
 
@@ -107,12 +108,12 @@ bundle and V8 engine decision are included.
   gated `spawn_blocking` entry point.
 - Validation: the final 35 server unit tests passed on macOS with `bench` enabled. An
   earlier 35-test Linux run passed, including the actual priority test, with `bench`
-  enabled. The Linux Docker build's final image export was cancelled after the tests passed when Kait checked CPU use. No load tests
+  enabled. The Linux Docker build's final image export was cancelled after the tests passed when the maintainer checked CPU use. No load tests
   or render benchmarks ran. Hash sizing assertions passed in the server suite; the host
   suite is deferred to avoid another large build during the other session's measurements.
 
 - Client: branch `081-client-refusal`, separate from the native branch, reviewed and
-  merged into `main` on 2026-10-07 as `a967782`..`74e1ba4`. Kait approved reusing Alert and the “Try again” button.
+  merged into `main` on 2026-10-07 as `a967782`..`74e1ba4`. The maintainer approved reusing Alert and the “Try again” button.
   The API preserves `Retry-After`, including non-JSON edge refusals. A refused optimistic
   write stays pending, and only that button sends its original variables again. The
   shared helper prevents automatic mutation retries and re-applies pending changes after
@@ -191,8 +192,8 @@ deadline, with room for fan-out and sub-second spikes. The 32/128 limits refuse
 instantly rather than at that deadline. Native host records the calculation and
 waiter memory estimate. No 256 comparison runs.
 
-Kait agrees to drop the 10% RSS rule. The criterion now records RSS at capacity, 2x,
-4x, and recovery against task 10's provisional 2-GiB whole-host budget for M, with
+The maintainer agrees to drop the 10% RSS rule. The criterion now records RSS at capacity,
+2x, 4x, and recovery against task 10's provisional 2-GiB whole-host budget for M, with
 no OOM or swap, bounded queues, 503 admission refusals with `Retry-After`, and passing
 recovery. The shared-host 85% safety stop is not a budget. The four-configuration
 capacity rerun and valid eight-reader overload comparison are in

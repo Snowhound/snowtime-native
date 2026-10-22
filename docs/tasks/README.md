@@ -7,7 +7,7 @@ memory and CPU, without a garbage collector in its own code. The TypeScript back
 the source of truth and keeps the Vercel deployment. An AI session generates the native
 port from a given commit of it. One frontend source works with both. Changes to the
 TypeScript app are welcome where they make this task much simpler. The native server
-renders pages in an embedded V8 isolate, and the browser hydrates them (subtask 01, Kait,
+renders pages in an embedded V8 isolate, and the browser hydrates them (subtask 01,
 2026-10-02); task 079's shells, which would have left it the API alone, are cancelled. This
 task researches the decisions and proves the gain on the hot path; full parity is a later
 task.
@@ -15,7 +15,7 @@ task.
 ## Targets
 
 - Snowtime's native server runs on one Hetzner instance of 1 vCPU and 2 GB, the
-  documented minimum, for one company of about 20 people (Kait, 2026-10-07). That fits
+  documented minimum, for one company of about 20 people (2026-10-07). That fits
   with room to spare, so the work aims at speed and at the porting kit, including its
   capacity figures per machine size (subtask 05), not at fitting the instance.
 - For constrained machines, a guideline that doesn't block progress: the app process with
@@ -38,7 +38,7 @@ task.
 
 ## Port approach
 
-Kait, 2026-10-03:
+2026-10-03:
 
 - **Make it work, then make it fast.** The first port uses the libraries' defaults and
   ordinary allocation. The data layout below comes after, where task 078's numbers show a
@@ -97,7 +97,7 @@ rejected, as in task 069.
    browser reads without parsing. Compare against Protobuf with ConnectRPC on decode time
    in the browser, compressed bytes, bundle size, and code generation for both languages.
 3. The frontend adapter. The data layer calls one client module, which calls the contract
-   on both backends; the TypeScript app drops server functions (task 084, Kait,
+   on both backends; the TypeScript app drops server functions (task 084,
    2026-10-03).
 
    Task 078 found that behind Caddy the app sees its own URL as `http`, so an `https`
@@ -128,12 +128,12 @@ rejected, as in task 069.
    - It's an alpha with two main maintainers. Its schemas can change between alphas.
 
    It names Google and GitHub providers, the two production uses. Microsoft sign-in can go
-   if it costs work (Kait, 2026-10-02). A spike runs the app's sign-in, passkey,
+   if it costs work (2026-10-02). A spike runs the app's sign-in, passkey,
    invitation, and API key flows against it on this app's schema, after task 080. If it
    holds, the native backend is in Rust. The proof of concept didn't use it: its email
    sign-in is the app's own code.
 
-   Kait, 2026-10-06: better-auth-rs is the intended auth library; its compatibility harness
+   2026-10-06: better-auth-rs is the intended auth library; its compatibility harness
    against `better-auth@1.7.6` outweighs the alpha label, which concerns its Rust API. The
    spike's main question is storage. Its SeaORM adapter, an optional crate behind the
    `seaorm2` feature, runs on sqlx's own connection pool, which would bypass the host's
@@ -154,7 +154,7 @@ rejected, as in task 069.
    record the evidence and adoption gates.
 
    It has no teams: they're its roadmap phases 14 and 15, outside its v1 scope, and on
-   2026-10-02 nobody had started them. So teams leave Better Auth first (task 080, Kait,
+   2026-10-02 nobody had started them. So teams leave Better Auth first (task 080,
    2026-10-02), and better-auth-rs needs no team support. The rejected way was a teams
    plugin for better-auth-rs. Invitations to a team and member removal live in its
    organization plugin, whose plugin trait has no hook that runs after another plugin's
@@ -166,7 +166,7 @@ rejected, as in task 069.
 
 ## Proof of concept
 
-Kait, 2026-10-04: the proof of concept starts without task 078's final baseline. It
+2026-10-04: the proof of concept starts without task 078's final baseline. It
 measures the TypeScript and Rust servers side by side with task 078's harness
 (`perf:stress`), each limited to one CPU. The Rust code lives in a `native/` Cargo
 workspace in this repository ("Repository" below). For the slice, the
@@ -183,7 +183,7 @@ the timer page and the week report, and the browser hydrates them (subtask 01).
 
 ## Repository
 
-Kait, 2026-10-05: the native code stays in this repository while the API contract still
+2026-10-05: the native code stays in this repository while the API contract still
 changes. A change to the contract then lands on both sides in one commit, and one CI
 checks both.
 
@@ -205,7 +205,7 @@ it, and runs the conformance suite and `compare.ts` from the pinned commit. This
 repository keeps the contract: the conformance tests and a load harness that takes a
 server image or address. The harness's native-specific parts move with the port.
 
-Kait, 2026-10-09: the split is `snowtime-native`, laid out as the porting kit will generate
+2026-10-09: the split is `snowtime-native`, laid out as the porting kit will generate
 a port (the kit's `docs/port-repository.md`). It starts with fresh history at the pinned
 commit rather than `git filter-repo`'s, as a generated port would; this branch keeps the
 proof of concept's history, and the task 081 records move to the new repository's
@@ -322,16 +322,16 @@ which records the edge measurements.
 
 Task 084 moved the TypeScript app from server functions to the same API, through one
 client module. Task 089 replaces that module's call table with routes and client functions
-per domain (Kait, 2026-10-04). On `main`, task 090 fixes `perf:stress`, and task 091 looks
+per domain (2026-10-04). On `main`, task 090 fixes `perf:stress`, and task 091 looks
 at server-side caching for both backends.
 
-Concurrency (Kait, 2026-10-06): Tokio's async workers run only the edge; blocking and CPU
+Concurrency (2026-10-06): Tokio's async workers run only the edge; blocking and CPU
 work runs in lanes, each a fixed number of workers behind admission that refuses when full.
 Under overload, timer calls keep working and reports and exports refuse first
 ([native-host.md](../../docs/architecture/native-host.md), subtask 17). Rendering is V8
-in the host (Kait, 2026-10-07); the Bun sidecar is parked
+in the host (2026-10-07); the Bun sidecar is parked
 ([native-rendering.md](../../docs/architecture/native-rendering.md), subtask 16).
 
-Libraries (Kait, 2026-10-04, subtask 03): Axum with `rusqlite` and SQL strings. Actix Web
+Libraries (2026-10-04, subtask 03): Axum with `rusqlite` and SQL strings. Actix Web
 was kept as an option until subtask 01's isolate ran in the host; with renderers on
 threads of their own behind Axum (subtask 01, 2026-10-04), Axum is final.

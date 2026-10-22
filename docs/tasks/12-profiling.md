@@ -34,7 +34,7 @@ current parser with simdjson, including input preparation, conversion to the app
 output types, and allocations. Measure the actual request and response payloads, then
 CPU per request and latency under matched load. Keep it only if the full path wins and
 preserves behavior. This is an option to investigate, not a selected dependency
-(Kait, 2026-10-07).
+(2026-10-07).
 
 ### The V8 render isolate
 
@@ -68,7 +68,7 @@ For each bucket, record its share of render CPU and what the cheapest fix would 
 native op, writing HTML straight into a Rust buffer instead of through a web stream, a
 change to the render bundle so it stops needing the API, or nothing.
 
-**Goal: render CPU close to Bun's** on the same pages (Kait, 2026-10-05). Deno's
+**Goal: render CPU close to Bun's** on the same pages (2026-10-05). Deno's
 extensions were the first choice because they fit `deno_core`, not because they were
 measured as the fastest. For each web API the bundle uses, measure the candidates in the
 isolate and keep the fastest that passes the render tests:

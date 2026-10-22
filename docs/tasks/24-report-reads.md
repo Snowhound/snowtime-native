@@ -74,7 +74,7 @@ can have different response values and byte counts. Report conformance and brows
 
 ## Verification
 
-Verified on macOS ARM64 on 2026-10-07, after Kait paused task 081.17's measurements:
+Verified on macOS ARM64 on 2026-10-07, after task 081.17's measurements were paused:
 
 The saved output below comes from that run; it was copied into the repository without
 rerunning verification.

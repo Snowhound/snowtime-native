@@ -16,7 +16,7 @@
     "--dataset=M",
     "--dataset-date=2026-10-04",
     "--run=fixed",
-    "--plan=/Users/kaitkasak/projects/snowtime/snowtime-081-lanes/perf/.cache/stress/08117/confirm-4096-1c-plan.json",
+    "--plan=<checkouts>/snowtime-081-lanes/perf/.cache/stress/08117/confirm-4096-1c-plan.json",
     "--recording=perf/.cache/stress/lanes-pages.json",
     "--encoding=gzip",
     "--no-build",

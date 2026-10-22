@@ -44,7 +44,7 @@ Measure the binary without Caddy against the binary behind Caddy, on the same
 RSS.
 
 **Stretch, later:** HTTP/3 with `quinn` and `h3`, in [subtask 09](09-http3.md). It's less
-mature than Caddy's, so don't try it until the rest is measured (Kait, 2026-10-04).
+mature than Caddy's, so don't try it until the rest is measured (2026-10-04).
 
 ## Acceptance criteria
 
@@ -96,7 +96,7 @@ so new connections do full handshakes. It negotiates HTTP/2 and reuses connectio
 These are TLS requests to Caddy's local certificate, rather than plaintext requests,
 but they do not model browser or Cloudflare session resumption.
 
-Raw results are in `/private/tmp/snowtime-081-edge/perf/.cache/stress/runs/`:
+Raw results are in `<tmp>/snowtime-081-edge/perf/.cache/stress/runs/`:
 `2026-10-04T16-52-10-M-fixed-081-edge-baseline` and
 `2026-10-04T16-55-12-M-fixed-081-edge-single-log`.
 
@@ -217,7 +217,7 @@ The saved native heap profile attributes 30.7% of sampled live heap to HTTP/2 DA
 frame buffers and 19.2% to HPACK header-table entries. This snapshot is after the
 absolute peak, so those percentages describe the sampled live heap, not peak RSS.
 They support the connection-state diagnosis. Profiles and counter snapshots are kept alongside the variant JSON in the measurement
-worktree at `/private/tmp/snowtime-081-edge/perf/.cache/stress/edge/`.
+worktree at `<tmp>/snowtime-081-edge/perf/.cache/stress/edge/`.
 
 ### Applied changes and checks
 
@@ -225,7 +225,7 @@ worktree at `/private/tmp/snowtime-081-edge/perf/.cache/stress/edge/`.
   and message, then one in 100. Removing the block restores full logs. This trades
   complete access history for a modest CPU saving; database audit records are unchanged.
 
-  Kait, 2026-10-08: reverted. The saving shows only under benchmark load, and the
+  2026-10-08: reverted. The saving shows only under benchmark load, and the
   deployments serve about 20 people, where sampling would still drop requests from a
   single page load's burst. Production keeps complete access logs. The native edge
   defaults to `EDGE_ACCESS_LOG=all`, with `sampled` as an option for a busy host; the
@@ -367,7 +367,7 @@ This comparison includes the configured memory limits and logging implementation
 the capacity gain is not an isolated TLS-library result.
 
 Run artifacts are retained in the measurement worktree at
-`/private/tmp/snowtime-081-edge/perf/.cache/stress/runs/`, under the labels
+`<tmp>/snowtime-081-edge/perf/.cache/stress/runs/`, under the labels
 `081-host-{proxy,direct}-{fixed,kinds,ramp}`, `081-host-{proxy,direct}-gzip-fixed`,
 `081-host-proxy-fixed-v2`, and `081-host-proxy-confirm-{100k,125k}`. The image identities,
 fixed-load aggregates, hold aggregates, and competing-process monitor are in

@@ -1,5 +1,5 @@
 cargo test --manifest-path native/Cargo.toml -p snowtime-server --features bench --offline
-   Compiling snowtime-server v0.1.0 (/private/tmp/snowtime-081-auth-port/native/crates/server)
+   Compiling snowtime-server v0.1.0 (<tmp>/snowtime-081-auth-port/native/crates/server)
     Finished `test` profile [unoptimized + debuginfo] target(s) in 6.66s
      Running unittests src/lib.rs (native/target/debug/deps/snowtime_server-fe761e0a3ed8b8b5)
 

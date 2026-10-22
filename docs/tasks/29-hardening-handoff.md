@@ -4,7 +4,7 @@ Completed on 2026-10-08. Work stops after the verified hardening commit.
 
 ## Working state
 
-- Worktree: `/private/tmp/snowtime-081-hardening`. Branch: `081-hardening`.
+- Worktree: `<tmp>/snowtime-081-hardening`. Branch: `081-hardening`.
 - Base: `081-native-poc` at `26ed262`. Main `0c176eb` was merged in `3599412`.
 - Portable TypeScript passkey fix: `4b800d0`. Its pinned dependency patch returns 400
   for malformed registration verification and preserves 500 for database failures.
@@ -20,8 +20,8 @@ Completed on 2026-10-08. Work stops after the verified hardening commit.
 ## Verification
 
 All required checks passed before each commit. Logs are in
-`/private/tmp/081-resume-first-checks`. Final hardening logs are in
-`/private/tmp/081-resume-second-checks`. Task 29 records counts and check scope.
+`<tmp>/081-resume-first-checks`. Final hardening logs are in
+`<tmp>/081-resume-second-checks`. Task 29 records counts and check scope.
 Pre-commit lint, formatting, and Knip run on each commit.
 
 ## Stop point

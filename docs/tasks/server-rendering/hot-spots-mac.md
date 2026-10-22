@@ -131,9 +131,9 @@ parts (task 081.12).
 
 ### Month and year, task 081.23
 
-2026-10-07, fresh profiles of `9adb20e`'s shared bundle, after Kait confirmed that the
-other measurement session had stopped. V8 uses a 32 MiB semi-space; both engines use
-one CPU and 2 GiB. Self-sample shares include idle samples, not whole-process CPU.
+2026-10-07, fresh profiles of `9adb20e`'s shared bundle, after the maintainer confirmed
+that the other measurement session had stopped. V8 uses a 32 MiB semi-space; both engines
+use one CPU and 2 GiB. Self-sample shares include idle samples, not whole-process CPU.
 Bun's builtin frames are listed separately from JavaScript functions.
 
 | Function or group                                     | V8 month | V8 year | Bun month | Bun year |
@@ -310,11 +310,11 @@ alternating rounds, but month costs V8 and Bun shared in the longer confirmation
 clone skip, class joins, and finished Lucide cache fail the quick rounds. All four are
 reverted; no app commit goes to `main`.
 
-Kait confirmed that task 081.17 was idle and cleared this session. An early screen used
-two alternating rounds of 100 renders on V8 shared only. All four candidates then ran
-four alternating rounds of 100 renders on timer, month, and year: V8 shared at a 32 MiB
-semi-space and Bun on both bundles. Containers have one CPU and 2 GiB. Rounds 2 and 4
-reverse the candidate order. Compare only within this table; positive changes cost CPU.
+The maintainer confirmed that task 081.17 was idle and cleared this session. An early
+screen used two alternating rounds of 100 renders on V8 shared only. All four candidates
+then ran four alternating rounds of 100 renders on timer, month, and year: V8 shared at a
+32 MiB semi-space and Bun on both bundles. Containers have one CPU and 2 GiB. Rounds 2 and
+4 reverse the candidate order. Compare only within this table; positive changes cost CPU.
 [Raw runs and bundle hashes](month-year-more-trials-mac.jsonl) include the early screen,
 the four quick rounds, and the final confirmation as separate sessions.
 

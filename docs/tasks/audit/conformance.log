@@ -38,9 +38,9 @@ conformance/oauth.conformance.ts:
 145 |       throw new Error('Latin-1 redirect header changed')
                       ^
 error: Latin-1 redirect header changed
-      at call (/Users/kaitkasak/projects/snowtime/snowtime-081-poc/conformance/oauth-flow.ts:145:17)
-      at async oauthFlow (/Users/kaitkasak/projects/snowtime/snowtime-081-poc/conformance/oauth-flow.ts:220:9)
-      at async <anonymous> (/Users/kaitkasak/projects/snowtime/snowtime-081-poc/conformance/oauth.conformance.ts:23:9)
+      at call (<repo>/conformance/oauth-flow.ts:145:17)
+      at async oauthFlow (<repo>/conformance/oauth-flow.ts:220:9)
+      at async <anonymous> (<repo>/conformance/oauth.conformance.ts:23:9)
 (fail) OAuth redirect sign-in, PKCE, state, linking, and account management contracts [139.28ms]
 
  0 pass

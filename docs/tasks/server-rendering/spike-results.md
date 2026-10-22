@@ -1,7 +1,7 @@
 # SSR in a Rust server: embedded JS engines compared
 
 > The spike's write-up from 2026-10-02, kept as it was. Its recommendation against an
-> embedded engine is superseded: Kait chose server rendering with V8 the same day, after
+> embedded engine is superseded: server rendering with V8 was chosen the same day, after
 > the heap and GC measurements in [01-server-rendering.md](../01-server-rendering.md).
 > The paths below (`bundle/`, `engines/`, `capture/`, and the scripts) are in the
 > gitignored `temp/ssr-spike/` of the `snowtime-ssr-spike` worktree, not in the repository.

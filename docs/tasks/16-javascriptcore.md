@@ -2,7 +2,7 @@
 
 Status: parked (gate failed; the Bun render sidecar is parked in favor of V8, 2026-10-07)
 
-Kait parked the sidecar on 2026-10-07, when tasks 081.19–081.22 had brought V8 to
+The sidecar was parked on 2026-10-07, when tasks 081.19–081.22 had brought V8 to
 1.21–1.30 times Bun's render CPU. Its open criteria wait on the conditions in
 [native-rendering.md](../../docs/architecture/native-rendering.md) that can reopen it.
 
@@ -177,7 +177,7 @@ Stop the other containers while measuring. Raw output goes to the ignored
 
 ## Bun render sidecar
 
-Decided by Kait on 2026-10-06: the Bun sidecar is the preferred renderer wherever memory
+Decided on 2026-10-06: the Bun sidecar is the preferred renderer wherever memory
 isn't the deciding constraint. V8 in the host stays the renderer for the smallest memory
 budgets and the fallback. The measurements below can still reverse this if the sidecar
 loses Bun's lead.
@@ -204,7 +204,7 @@ brings its improvements, with no fork or bindings of ours to keep up.
   RSS (`/proc/<pid>/status`) passes its limit, starting the replacement first where memory
   allows. Readiness and liveness follow "Health" in
   [native-host.md](../../docs/architecture/native-host.md#health).
-- **Lanes.** Kait, 2026-10-06: the sidecar follows the host's lane contract
+- **Lanes.** 2026-10-06: the sidecar follows the host's lane contract
   ([native-host.md](../../docs/architecture/native-host.md)). The rules it adds,
   least privilege, one page in flight per renderer, the page buffered whole, deadlines
   enforced by SIGKILL, a restart budget, recycling one renderer at a time within the

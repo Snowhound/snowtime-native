@@ -1,14 +1,14 @@
 # Native server rendering
 
 Planned for the native backend (task 081); the TypeScript deployment remains on Start.
-Kait chose embedded rendering on 2026-10-02. The render crate implements it, and the
+Embedded rendering was chosen on 2026-10-02. The render crate implements it, and the
 native host (`snowtime-axum`) serves the timer and report pages through it.
 [Task 081.01](../tasks/01-server-rendering.md) records measurements
 and remaining work.
 
 Two engines sit behind one interface (`Pool`, `PageRequest`, `Page`), and `RENDER_ENGINE`
-picks one at start. Kait decided on 2026-10-07 that V8 embedded in the host is the engine,
-and parked the Bun sidecar
+picks one at start. The maintainer decided on 2026-10-07 that V8 embedded in the host is
+the engine, and parked the Bun sidecar
 ([task 081.16](../tasks/16-javascriptcore.md)). Tasks 081.19–081.22
 brought V8 to 1.21–1.30 times Bun's render CPU on the four measured pages, from 1.50–1.63
 when the sidecar was chosen on 2026-10-06, at the same or lower peak RSS and about 61 MB
@@ -84,7 +84,7 @@ lane contract; task 081.16 records the shape, the image, upgrades, and licensing
 - **One page in flight per renderer.** Rendering is CPU-bound and Bun runs JavaScript on
   one thread, so a second page in the same process would wait inside Bun, where the host
   can't see or bound it. The pool's queue stays the only queue.
-- **Least privilege where it's cheap.** Kait, 2026-10-06: render code is trusted as much as
+- **Least privilege where it's cheap.** 2026-10-06: render code is trusted as much as
   the TypeScript server's code, but it's the only npm code in the native server and it
   sees every user's session, so a renderer gets only what rendering needs:
   - an empty environment plus the renderer's settings, so no secrets;
@@ -125,7 +125,7 @@ lane contract; task 081.16 records the shape, the image, upgrades, and licensing
 
 - Static shells (task 079): their warm load showed content 430–480 ms later than a
   server-rendered page. The shell decision and the spike's earlier recommendation against
-  embedding are superseded by Kait's choice above.
+  embedding are superseded by the choice above.
 - Actix Web, with an isolate per worker: it measured 4.5% less CPU on the timer page
   than Axum's shared render thread (task 081.01), which doesn't outweigh Axum's fit with
   the API router and better-auth-rs, and Axum keeps the renderer count apart from HTTP

@@ -1,6 +1,6 @@
 # Native host: concurrency and processes
 
-How the native backend (task 081) schedules its work. Kait decided this on 2026-10-06,
+How the native backend (task 081) schedules its work. This was decided on 2026-10-06,
 after the overload measurements of tasks 081.03 and 081.10, a review of
 [Tina](https://github.com/pmbanugo/tina) and its author's
 [case against async/await for mixed network and CPU work](https://pmbanugo.me/blog/why-async-await-complect-concurrency),
@@ -42,7 +42,7 @@ Every lane keeps the same contract:
 Every lane is a gate taken asynchronously in front of dedicated threads, or a process,
 fed by a bounded channel, as the V8 renderers are. Task 081.10 first ran database work
 through a semaphore and `spawn_blocking`, with Tokio's blocking threads capped at
-readers plus one. Kait decided on 2026-10-08, from finding M6 of
+readers plus one. The maintainer decided on 2026-10-08, from finding M6 of
 [task 081.30](../tasks/30-audit.md), that every lane gets its own
 threads and Tokio's blocking pool holds no lane. The audit found that the pool also runs
 `tokio::fs` for static files and reqwest's DNS lookups. On one core the writer then
@@ -230,13 +230,13 @@ The queue decision is recorded below. Task 081.27 holds the remaining capacity a
 
 ## Overload policy
 
-Kait, 2026-10-06: when a server shared by many companies is overloaded, ordinary timer
+2026-10-06: when a server shared by many companies is overloaded, ordinary timer
 reads and writes keep working, and reports and exports refuse first. Reports and exports
 get a smaller admission budget inside the database lane, and an export can't hold more
 than its share of workers. Limits per company or per user come only if a measurement
 shows one tenant crowding out the others.
 
-Planned (task 081.17, Kait, 2026-10-06), a change to the app: the client keeps a refused
+Planned (task 081.17, 2026-10-06), a change to the app: the client keeps a refused
 edit, so a write the server refused before running it (503 with `Retry-After`) stays
 pending with a retry action instead of restoring the caches, and nothing retries a write
 on its own. Reads retry with jitter and wait at least the `Retry-After` the server sent.
@@ -356,8 +356,8 @@ Require no OOM kill or swap, queues within their bounds, admission refusals as 5
 with `Retry-After`, and a recovery hold that passes the normal latency and error
 targets. A judged phase needs generator headroom and no dropped actions.
 
-Kait agrees to drop the flat 10% RSS rule. Task 081.10's whole-host budget includes
-OS, replication, and filesystem cache; app RSS alone cannot validate a standalone
+The maintainer agrees to drop the flat 10% RSS rule. Task 081.10's whole-host budget
+includes OS, replication, and filesystem cache; app RSS alone cannot validate a standalone
 2-GiB deployment. The shared-host 85% guard remains a harness safety stop and is not
 an acceptance budget. Task 081.27 carries the remaining overload measurements under
 this criterion, including a valid eight-reader run with enough generator headroom.

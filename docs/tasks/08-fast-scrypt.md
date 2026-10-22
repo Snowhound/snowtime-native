@@ -8,7 +8,7 @@ Before this task, the native server verified Better Auth's scrypt hashes with `s
 change it, and neither did keeping glibc from returning scrypt's 32 MB buffer. The cause
 was not found in those runs. At load, scrypt was 37–60% of the native app's CPU, and
 probably the cause of the native p95 of 84–126 ms (subtask 03, "Load" and "Each candidate at a fixed load").
-Kait wants it fixed rather than accepted (2026-10-04).
+The maintainer wants it fixed rather than accepted (2026-10-04).
 
 ## Constraints
 
@@ -219,7 +219,7 @@ p50 of 156 ms confirms it ran the old password code.
 - The 4xx counts (157–413) are the shared-user `stopTimer` 404s. This worktree's harness
   predates task 090's fix.
 
-Raw results, in `/private/tmp/snowtime-081-fast-scrypt/perf/.cache/stress/runs/`:
+Raw results, in `<tmp>/snowtime-081-fast-scrypt/perf/.cache/stress/runs/`:
 `2026-10-04T13-00-02-M-fixed-081-scrypt-rerun-awslc-1`, `...13-02-26-...-rustcrypto`, and
 `...13-04-49-...-awslc-2`.
 

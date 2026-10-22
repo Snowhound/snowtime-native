@@ -6,7 +6,7 @@ Audit the whole native host (`native/`) before it becomes its own repository. St
 reviews of 081.01–081.29 looked at one change at a time; this audit looks at the whole for
 what they missed. Work on `081-audit`, from `081-native-poc` at `a20713f`. Record findings
 only; don't fix them, except typos. No Docker, load, or stress runs. Don't push or merge
-without Kait's approval.
+without the maintainer's approval.
 
 ## Acceptance criteria
 
@@ -225,7 +225,7 @@ four-thread blocking pool for files and DNS.
 - **Fix:** give the database lanes their own threads, as the hash lane has, or reserve
   separate blocking capacity for file and DNS work, or serve the immutable public files
   from memory. Correct the doc and extend the source test to the host crate.
-- **Decided** (Kait, 2026-10-08): database owner threads, a startup index of the public
+- **Decided** (2026-10-08): database owner threads, a startup index of the public
   files' paths, and a fixed 2–4 thread blocking pool for files and DNS; no preloading,
   because a CDN fronts the host. Recorded in `docs/architecture/native-host.md`; task
   081.34 builds it.

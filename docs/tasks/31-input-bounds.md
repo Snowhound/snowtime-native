@@ -61,7 +61,7 @@ zero, and negative values retain their existing behavior.
 
 ### Initial verification at `1a1fb6d`
 
-2026-10-08, macOS arm64. Full logs are in `/private/tmp/081-input-bounds-checks`.
+2026-10-08, macOS arm64. Full logs are in `<tmp>/081-input-bounds-checks`.
 
 - `bun install`, `i18n:compile`, frontend build, and render bundle build pass.
   The two isolated benchmark packages are installed with their frozen lockfiles.
@@ -116,7 +116,7 @@ No Docker, load, or stress runs. No push, rebase, or merge.
 
 Continue from `1a1fb6d` on the same branch. Remove the provider-image refusal, bound
 encoded caller URLs in OAuth state, and return the stored passkey-session user agent.
-Logs: `/private/tmp/081-input-followup-checks`, separate from the initial verification.
+Logs: `<tmp>/081-input-followup-checks`, separate from the initial verification.
 
 - Dependency installation, translation compilation, frontend build, and render bundle
   build pass. Rust formatting and workspace Clippy with all targets and warnings denied

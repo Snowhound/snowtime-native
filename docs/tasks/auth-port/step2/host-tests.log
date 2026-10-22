@@ -2,7 +2,7 @@ cargo test --manifest-path native/Cargo.toml -p snowtime-host --offline
    Compiling serde_v8 v0.314.0
    Compiling hickory-proto v0.25.2
    Compiling rustls-acme v0.15.4
-   Compiling snowtime-server v0.1.0 (/private/tmp/snowtime-081-auth-port/native/crates/server)
+   Compiling snowtime-server v0.1.0 (<tmp>/snowtime-081-auth-port/native/crates/server)
    Compiling deno_core v0.405.0
    Compiling hickory-resolver v0.25.2
    Compiling deno_io v0.162.0
@@ -13,8 +13,8 @@ cargo test --manifest-path native/Cargo.toml -p snowtime-host --offline
    Compiling deno_fs v0.162.0
    Compiling deno_net v0.244.0
    Compiling deno_fetch v0.276.0
-   Compiling snowtime-render v0.1.0 (/private/tmp/snowtime-081-auth-port/native/crates/render)
-   Compiling snowtime-host v0.1.0 (/private/tmp/snowtime-081-auth-port/native/crates/host)
+   Compiling snowtime-render v0.1.0 (<tmp>/snowtime-081-auth-port/native/crates/render)
+   Compiling snowtime-host v0.1.0 (<tmp>/snowtime-081-auth-port/native/crates/host)
     Finished `test` profile [unoptimized + debuginfo] target(s) in 20.45s
      Running unittests src/main.rs (native/target/debug/deps/snowtime_axum-9ba503b6ccbc0f52)
 

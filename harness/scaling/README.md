@@ -109,7 +109,7 @@ evidence and is repeated; it is not claimed as capacity.
 
 ## Two-machine repeat on Hetzner
 
-Kait provisions a dedicated-CPU app server and a separate k6 machine on the same
+The maintainer provisions a dedicated-CPU app server and a separate k6 machine on the same
 private network. This script provisions nothing. Copy this checkout, the source M/L
 databases, users, and recording to the appropriate machines. Use
 [`perf/README.md`](../../app/perf/README.md)'s remote stack setup and credentials.
@@ -229,7 +229,7 @@ before the driver, and save UTC start/end times beside it. Remote mode gives k6 
 available generator CPUs; it does not apply the local `--k6-cpuset` flag. Record its
 actual cpuset and memory limit with `docker inspect` while it runs. Stop
 when it loses substantial headroom or drops actions. Preserve both machines' counters
-with the raw folder. This remote protocol requires Kait's server, TLS, and tunnel
+with the raw folder. This remote protocol requires the maintainer's server, TLS, and tunnel
 setup and has not run in this task; local matrix results do not validate that setup.
 
 ## Proxy memory redistribution

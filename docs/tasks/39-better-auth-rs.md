@@ -3,8 +3,8 @@
 Status: done (2026-10-11): sign-out, OAuth, and API key creation on the library; the fork pushed and offered upstream; the gate passing
 
 Move the port's auth onto better-auth-rs, the intended library ([question 5](README.md),
-Kait, 2026-10-06), on a branch, and measure what it costs. This applies the kit's auth
-recipe ([05](05-porting-recipes.md), Kait, 2026-10-08): the library serves the flows,
+2026-10-06), on a branch, and measure what it costs. This applies the kit's auth
+recipe ([05](05-porting-recipes.md), 2026-10-08): the library serves the flows,
 its gaps are fixed in a fork and offered upstream, what it lacks goes in a crate beside
 it, and 081.28's hand-ported flows are the fallback for gaps.
 
@@ -13,7 +13,7 @@ registration TypeScript accepts failed with 500 ([spike](auth-spike.md), adoptio
 Upstream fixed it in `f4470b0a` (2026-09-30), before the pin, with a dual-server compat
 test of registrations with and without user verification. The app's passkey module
 (`crates/server/src/auth/passkeys.rs`, 081.28, on `webauthn-rs-core` with TypeScript's
-preferred policy) still stays beside the library (Kait, 2026-10-10). The per-request signed-cookie check
+preferred policy) still stays beside the library (2026-10-10). The per-request signed-cookie check
 and AWS-LC scrypt sign-in also stay app code. This is a separate bug from snowtime's task
 092, whose patch answers a malformed registration with 400 instead of Better Auth's 500.
 
@@ -30,10 +30,10 @@ from the tag `archive/081-native-poc`, before 081.37 removed them.
       SeaORM or sqlx pool, and async transaction callbacks bounded by a writer-lifetime
       deadline as well as the lane's admission deadline (adoption gate 3).
 - [x] The library serves the auth routes the app uses except passkeys: sessions and
-      sign-out, Google and GitHub OAuth (Microsoft may drop if it costs work, Kait,
+      sign-out, Google and GitHub OAuth (Microsoft may drop if it costs work,
       2026-10-02), organizations and invitations, and API keys through its server-only
       operations, with its HTTP key endpoints closed. Organizations and invitations stay
-      app code instead: the library's plugin matched 38 of 141 steps (Kait, 2026-10-10).
+      app code instead: the library's plugin matched 38 of 141 steps (2026-10-10).
 - [x] Passkeys stay in `auth/passkeys.rs` on the same tables, with the library's plugin
       unmounted. Upstream's `master` already accepts registrations without user
       verification (`f4470b0a`), so no issue is needed. The cookie check and AWS-LC
@@ -48,7 +48,7 @@ from the tag `archive/081-native-poc`, before 081.37 removed them.
       against the baseline frozen at `5a5cb9b` on 2026-10-10; the table and any flags are
       recorded here. The full kit baseline on the Ryzen stays open in
       [081.01](01-server-rendering.md#baseline-before-the-kit-refactor), outside this task
-      (Kait, 2026-10-11).
+      (2026-10-11).
 - [x] Recorded here: the auth code the library replaced and what stays, in lines; binary
       size; upstream gaps found, with issues or pull requests filed. The porting kit gets a
       recipe either way: the library where it fits, an app-owned recipe where it doesn't.
@@ -115,29 +115,30 @@ plugins and a CLI the port doesn't mount. The gate's Linux sizes are pending its
 
 ### OAuth (`433d762`)
 
-Kait chose to fix the library's OAuth in the fork (2026-10-10). Sign-in, linking, the
-callback, `list-accounts`, and `unlink-account` go to the library's OAuth and account
-plugins. The fork rewrote the state layer to better-auth 1.7's protocol and fixed eleven
-smaller gaps; [upstream.md](better-auth-rs/upstream.md) lists them. App code beside the
-library: `library/providers.rs` (Google's and Microsoft's ID-token profiles, Microsoft's
-Graph photo, the fake provider's transport), `library/policy.rs` (the login-domain
-middleware and the app's input bounds), the store's hook refusals (`EMAIL_UNVERIFIED`,
-`LOGIN_DOMAIN_NOT_ALLOWED`), and the bridge's Latin-1 headers and callback-URL encoding.
-The library follows the host's clock through the fork's `time::set_clock`, so `PERF_NOW`
-moves it as it moves the app. The bar is unchanged: conformance 66/570/13, `compare.ts`
-1,490 byte-equal (128 OAuth calls), hardening 17. The native `oauth.rs` (1,370 lines) and
-its validators are removed.
+The maintainer chose to fix the library's OAuth in the fork (2026-10-10). Sign-in,
+linking, the callback, `list-accounts`, and `unlink-account` go to the library's OAuth and
+account plugins. The fork rewrote the state layer to better-auth 1.7's protocol and fixed
+eleven smaller gaps; [upstream.md](better-auth-rs/upstream.md) lists them. App code beside
+the library: `library/providers.rs` (Google's and Microsoft's ID-token profiles,
+Microsoft's Graph photo, the fake provider's transport), `library/policy.rs` (the
+login-domain middleware and the app's input bounds), the store's hook refusals
+(`EMAIL_UNVERIFIED`, `LOGIN_DOMAIN_NOT_ALLOWED`), and the bridge's Latin-1 headers and
+callback-URL encoding. The library follows the host's clock through the fork's
+`time::set_clock`, so `PERF_NOW` moves it as it moves the app. The bar is unchanged:
+conformance 66/570/13, `compare.ts` 1,490 byte-equal (128 OAuth calls), hardening 17. The
+native `oauth.rs` (1,370 lines) and its validators are removed.
 
 ### Organizations: kept as app code
 
 Mounting the library's organization plugin matched 38 of 141 auth-writes steps. Beyond
 key order and validation messages, its role and permission behavior differs from
 better-auth's: a member could remove themselves, an unknown role was saved, an admin
-couldn't rename the organization. Kait chose (2026-10-10) to keep 081.28's organization,
-invitation, and profile writes as app code beside the library, measure the whole port,
-and then decide between better-auth-rs and promoting 081.28's port to a kit crate. The
-attempt is saved in `temp/081.39/org-experiment.patch`; `temp/081.39/scripts/writes-debug.ts`
-prints every differing auth-writes step even when the flow throws.
+couldn't rename the organization. The maintainer chose (2026-10-10) to keep 081.28's
+organization, invitation, and profile writes as app code beside the library, measure the
+whole port, and then decide between better-auth-rs and promoting 081.28's port to a kit
+crate. The attempt is saved in `temp/081.39/org-experiment.patch`;
+`temp/081.39/scripts/writes-debug.ts` prints every differing auth-writes step even when
+the flow throws.
 
 ### API keys
 
@@ -267,8 +268,8 @@ this branch keeps. Forward-port any app features added since by rerunning the ba
 
 ### Next
 
-Kait chose (2026-10-10) to keep better-auth-rs, with organizations, invitations, and
-profile writes, passkeys, and password sign-in as app code beside it.
+The maintainer chose (2026-10-10) to keep better-auth-rs, with organizations, invitations,
+and profile writes, passkeys, and password sign-in as app code beside it.
 
 1. The kit's auth recipe is written: `recipes/auth/better-auth.md` in the porting kit
    (2026-10-11).

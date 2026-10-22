@@ -1,4 +1,4 @@
-   Compiling snowtime-server v0.1.0 (/private/tmp/snowtime-081-auth-port/native/crates/server)
+   Compiling snowtime-server v0.1.0 (<tmp>/snowtime-081-auth-port/native/crates/server)
     Finished `test` profile [unoptimized + debuginfo] target(s) in 2.99s
      Running unittests src/lib.rs (native/target/debug/deps/snowtime_server-ffc3584053cb8ef9)
 

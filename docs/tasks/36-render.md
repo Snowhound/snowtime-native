@@ -3,8 +3,8 @@
 Status: done
 
 Fix M2, M3, and L8–L12 from task 081.30 on branch `081-render`, from `081-audit` at
-`d67ba4c`. Kait decided on 2026-10-08 to drop `deno_net` and `deno_fetch` rather than
-disable their ops. Pages must render the same bytes.
+`d67ba4c`. The maintainer decided on 2026-10-08 to drop `deno_net` and `deno_fetch` rather
+than disable their ops. Pages must render the same bytes.
 
 ## Acceptance criteria
 

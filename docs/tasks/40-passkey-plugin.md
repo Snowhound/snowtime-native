@@ -8,7 +8,7 @@ because alpha.3's plugin refused registrations without user verification; upstre
 that in `f4470b0a` (2026-09-30), before the pin, with a dual-server compat test. Whether
 the plugin answers Snowtime's flows byte for byte hasn't been tried. Work on a branch from
 `main` after 081.39 merges, the way 081.39 tried organizations: mount, compare, count,
-then decide with Kait.
+then decide with the maintainer.
 
 ## Steps
 
@@ -27,13 +27,14 @@ then decide with Kait.
    steps and sort them into format differences (key order, messages, cookie attributes),
    which are fork fixes, and behavior differences (accepted or refused ceremonies,
    counters, stored rows), which keep the module.
-5. Stop and report to Kait with the count and the list before fixing anything in the fork.
+5. Stop and report to the maintainer with the count and the list before fixing anything in
+   the fork.
 
 ## Acceptance criteria
 
 - [x] The experiment's result recorded here: steps matched out of the flow's total, each
       difference classified as format or behavior, and the fork fixes it would take.
-- [x] Kait's decision recorded: the library's plugin or the app's module.
+- [x] The maintainer's decision recorded: the library's plugin or the app's module.
 - [ ] (Not applicable: the module stays.) If the plugin: `passkeys.rs` removed, the bar unchanged (conformance 66/570/13,
       `compare.ts` every call byte-equal, `passkey-compare.ts`, hardening 17,
       `page-compare.ts`, server, host, and render tests, CI), each fork fix with a test on
@@ -133,12 +134,12 @@ and the challenge format.
 
 ### Decision
 
-Kait chose the app's module (2026-10-11): `passkeys.rs` stays, the plugin stays unmounted,
-and the store keeps refusing passkey calls. The plugin would move about 1,000 lines from
-the port into the fork rather than remove them, passkeys have no providers or protocol
-churn for upstream to maintain, and upstream hasn't answered the seven pull requests yet.
-Reconsider once upstream merges those and the OAuth state issue is settled; the
-experiment is in `temp/081.40/passkey-experiment.patch`.
+The maintainer chose the app's module (2026-10-11): `passkeys.rs` stays, the plugin stays
+unmounted, and the store keeps refusing passkey calls. The plugin would move about 1,000
+lines from the port into the fork rather than remove them, passkeys have no providers or
+protocol churn for upstream to maintain, and upstream hasn't answered the seven pull
+requests yet. Reconsider once upstream merges those and the OAuth state issue is settled;
+the experiment is in `temp/081.40/passkey-experiment.patch`.
 
 Kept from the experiment: the store's `consume_verification` and
 `consume_verification_by_identifier` compare expiry with the library's clock instead of

@@ -5,7 +5,7 @@ Status: done
 Close the client-address, auth-limit, request-panic, and TypeScript-check gaps left by
 [01](01-server-rendering.md#open) and [28](28-auth-port.md#follow-up). Work on
 `081-hardening`, from `081-native-poc`, merging `main` first. Stop after these fixes;
-review the remaining Open items with Kait before implementing them.
+review the remaining Open items with the maintainer before implementing them.
 
 ## Acceptance criteria
 
@@ -44,7 +44,7 @@ failures retain 500.
 
 ## Rate limiter choice
 
-Kait, 2026-10-08: use `governor`'s keyed in-memory GCRA limiter through
+2026-10-08: use `governor`'s keyed in-memory GCRA limiter through
 `tower_governor`'s Tower layer, applied per route group. In memory suffices for one
 native host; TypeScript's Redis store shares counts across instances. Tower's
 `RateLimitLayer` limits globally, not by key. Caddy's plugin doesn't serve the default
@@ -175,7 +175,7 @@ unimplemented.
 
 ### Resumed verification before the portable passkey commit
 
-2026-10-08; logs: `/private/tmp/081-resume-first-checks`.
+2026-10-08; logs: `<tmp>/081-resume-first-checks`.
 
 - Formatting, workspace Clippy with all targets and warnings denied in both modes,
   `tsc --noEmit`, Oxlint, and all three Knip configurations pass.
@@ -195,7 +195,7 @@ in the suite are corrected next, with another complete verification run.
 
 ### Final hardening verification
 
-2026-10-08; logs: `/private/tmp/081-resume-second-checks`.
+2026-10-08; logs: `<tmp>/081-resume-second-checks`.
 
 - Workspace Clippy with all targets and warnings denied passes in both modes.
   Server tests: 83 without `bench`, 83 with it; host tests: 17.

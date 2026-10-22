@@ -291,7 +291,7 @@
    Compiling tokio-stream v0.1.19
    Compiling aws-lc-rs v1.18.1
    Compiling rustls v0.23.40
-   Compiling snowtime-server v0.1.0 (/Users/kaitkasak/projects/snowtime/snowtime-081-report-reads/native/crates/server)
+   Compiling snowtime-server v0.1.0 (<checkouts>/snowtime-081-report-reads/native/crates/server)
    Compiling rustls-webpki v0.103.15
    Compiling rcgen v0.13.2
    Compiling tokio-rustls v0.26.6
@@ -307,8 +307,8 @@
    Compiling quinn v0.11.12
    Compiling deno_tunnel v0.8.1
    Compiling deno_net v0.244.0
-   Compiling snowtime-render v0.1.0 (/Users/kaitkasak/projects/snowtime/snowtime-081-report-reads/native/crates/render)
-   Compiling snowtime-host v0.1.0 (/Users/kaitkasak/projects/snowtime/snowtime-081-report-reads/native/crates/host)
+   Compiling snowtime-render v0.1.0 (<checkouts>/snowtime-081-report-reads/native/crates/render)
+   Compiling snowtime-host v0.1.0 (<checkouts>/snowtime-081-report-reads/native/crates/host)
     Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 01s
      Running unittests src/main.rs (native/target/debug/deps/snowtime_axum-f8f17e8e478d3a74)
 

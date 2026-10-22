@@ -23,10 +23,10 @@ migrations: FAILED  8 | }
 13 |         throw new TypeError(`Expected client configuration as object, got ${typeof config}`);
                        ^
 TypeError: Expected client configuration as object, got undefined
-      at expandConfig (/Users/kaitkasak/projects/snowtime/snowtime-081-poc/node_modules/@libsql/core/lib-esm/config.js:13:19)
-      at createClient (/Users/kaitkasak/projects/snowtime/snowtime-081-poc/node_modules/@libsql/client/lib-esm/node.js:11:26)
-      at drizzle (/Users/kaitkasak/projects/snowtime/snowtime-081-poc/node_modules/drizzle-orm/libsql/driver.js:9:88)
-      at migrations (/Users/kaitkasak/projects/snowtime/snowtime-081-poc/temp/audit-probe/probe.ts:312:19)
+      at expandConfig (<repo>/node_modules/@libsql/core/lib-esm/config.js:13:19)
+      at createClient (<repo>/node_modules/@libsql/client/lib-esm/node.js:11:26)
+      at drizzle (<repo>/node_modules/drizzle-orm/libsql/driver.js:9:88)
+      at migrations (<repo>/temp/audit-probe/probe.ts:312:19)
 
 verification: rows 0 -> 50 after 50 unauthenticated authenticate-options
 verification: unauthenticated sign-in/social with 1.5 MB additionalData -> 200; largest row 1500249 bytes

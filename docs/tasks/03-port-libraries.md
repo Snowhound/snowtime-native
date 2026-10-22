@@ -4,7 +4,7 @@ Status: in-progress (libraries chosen 2026-10-04; the decision record follows su
 
 Port a cut-down timer that has every building block of the real app, once per candidate
 library, and choose the libraries by how closely the Rust code follows the TypeScript and
-by what they cost in CPU and memory. Kait's rule (2026-10-03): ease of porting decides
+by what they cost in CPU and memory. The rule (2026-10-03): ease of porting decides
 where it differs measurably and the performance penalty isn't significant. Otherwise
 performance decides.
 
@@ -306,7 +306,7 @@ candidate with Cargo's caches mounted takes 44 s from nothing and 2–13 s after
 
 ### Decision
 
-Kait, 2026-10-04:
+2026-10-04:
 
 - **Axum with `rusqlite` and SQL strings.** Axum and Actix cost the same CPU and memory
   within the noise of these runs. Axum is what better-auth-rs runs on (question 5). Its

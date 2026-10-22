@@ -3,7 +3,7 @@
 Status: done
 
 Fix M10, L3–L7, L20, and the edge's 413 from task 081.30, the 081.32 follow-up on the
-login-domain session check, and the CDN keep-alive defaults Kait asked for on 2026-10-09.
+login-domain session check, and the CDN keep-alive defaults requested on 2026-10-09.
 Branch `081-edge-config`, from `081-audit` at `c7634a5`. 081.34's file index already fixed
 M11.
 

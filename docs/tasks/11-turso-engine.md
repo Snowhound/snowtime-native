@@ -3,12 +3,12 @@
 Status: todo (research; after subtask 10 measures the read pool)
 
 The native backend uses SQLite's C library through `rusqlite`, with one writer and, from
-subtask 10, a pool of readers on WAL. Self-hosted backups stay with Litestream (Kait,
-2026-10-05). This subtask finds out whether [Turso's engine](https://github.com/tursodatabase/turso),
+subtask 10, a pool of readers on WAL. Self-hosted backups stay with Litestream
+(2026-10-05). This subtask finds out whether [Turso's engine](https://github.com/tursodatabase/turso),
 the Rust rewrite of SQLite, would make the app measurably faster, and if so, how its
 databases could be backed up.
 
-Kait, 2026-10-05: if the speed difference is significant, a good backup solution is worth
+2026-10-05: if the speed difference is significant, a good backup solution is worth
 searching for. Turso Cloud is acceptable for this app. Ideally Turso works with backups to
 S3, or another well-designed local solution. Otherwise the porting kit (subtask 05) can
 carry two recipes, one for SQLite and one for Turso.

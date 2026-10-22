@@ -4,7 +4,7 @@ Status: done
 
 Fix H2, L13, L14, and L15 from task 081.30 on branch `081-sql`, based on
 `081-audit`. Application TypeScript and drizzle-orm's libsql migrator remain the
-source of truth. Kait approved changing the audit probe fixture on 2026-10-08.
+source of truth. The maintainer approved changing the audit probe fixture on 2026-10-08.
 
 ## Acceptance criteria
 

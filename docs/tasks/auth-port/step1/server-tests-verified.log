@@ -1,5 +1,5 @@
     Blocking waiting for file lock on build directory
-   Compiling snowtime-server v0.1.0 (/private/tmp/snowtime-081-auth-port/native/crates/server)
+   Compiling snowtime-server v0.1.0 (<tmp>/snowtime-081-auth-port/native/crates/server)
     Finished `test` profile [unoptimized + debuginfo] target(s) in 4.10s
      Running unittests src/lib.rs (native/target/debug/deps/snowtime_server-2e09d33f6e83d814)
 

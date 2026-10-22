@@ -4,10 +4,10 @@ Status: in-progress (the native host serves pages; Hetzner confirmation is defer
 until the port and porting-kit refactor are complete)
 
 The native backend renders pages and the browser hydrates them, as it does with today's
-Start server. Rust embeds a V8 isolate that runs the app's Solid server render. Kait chose
-this on 2026-10-02 over task 079's shells: a shell's warm load shows content 430–480 ms
-later than a server-rendered page (task 079, "Measured"), and the spike below found
-rendering cheap and hydration compatible. Task 079 is cancelled.
+Start server. Rust embeds a V8 isolate that runs the app's Solid server render. The
+maintainer chose this on 2026-10-02 over task 079's shells: a shell's warm load shows
+content 430–480 ms later than a server-rendered page (task 079, "Measured"), and the spike
+below found rendering cheap and hydration compatible. Task 079 is cancelled.
 
 ## Findings
 
@@ -178,7 +178,7 @@ Linux peaks probably had the same cause; they weren't re-measured.
 
 #### Memory target
 
-Kait, 2026-10-07: Snowtime's own native server targets one Hetzner instance of 1 vCPU
+2026-10-07: Snowtime's own native server targets one Hetzner instance of 1 vCPU
 and 2 GB. The figures below are a guideline for constrained machines, kept so the port
 stays able to run in them, and a change that misses them isn't rejected for that alone.
 They count the app process only, since the proxy and replication have budgets of their
@@ -447,7 +447,7 @@ means creating a new isolate.
 
 ## Planned
 
-Kait agreed to both on 2026-10-03. The render crate implements them on 2026-10-04
+The maintainer agreed to both on 2026-10-03. The render crate implements them on 2026-10-04
 with Deno extensions and the policy measured above:
 
 - [x] **Native web APIs in the host.** Bun renders faster than the embedded engines because
@@ -484,15 +484,15 @@ gaps, with production-mode refusal checks and a shared write-limit switch.
 
 ## Baseline before the kit refactor
 
-Status: procedure prepared on 2026-10-08; Ryzen results pending Kait's run. This full
-baseline records the starting capacity and app RSS for the kit phase. It does not
+Status: procedure prepared on 2026-10-08; Ryzen results pending the maintainer's run. This
+full baseline records the starting capacity and app RSS for the kit phase. It does not
 close the Hetzner criterion, which waits until the port and kit refactor are complete.
 The quick per-step gate is documented in [native/README.md](../../README.md#performance-gate).
 
-Run on Kait's Ryzen under WSL with Docker. The script records the exact CPU, kernel,
+Run on the Ryzen under WSL with Docker. The script records the exact CPU, kernel,
 Docker resources/version, commit and working-tree diff, image IDs, SHA-256 input
 hashes, UTC command boundaries, and arguments. Record the resulting identifiers,
-held offer, two lifetime/hold RSS peaks, and raw evidence here after Kait returns
+held offer, two lifetime/hold RSS peaks, and raw evidence here after the maintainer returns
 output. No numbers are claimed before that run. Step 0 remains commit `332b476`.
 
 [`kit-baseline.ts`](../../harness/scaling/kit-baseline.ts) runs one M capacity
@@ -558,7 +558,7 @@ only the ramp and two RSS holds; it is not rerun at every refactor step.
       CPU per render, with the GC policy chosen
 - [x] A render API in the proof of concept: Rust serves the timer and week report
       server-rendered, and Start's client hydrates them
-- [x] A memory target for the native backend with a renderer, agreed with Kait
+- [x] A memory target for the native backend with a renderer, agreed with the maintainer
 - [ ] Confirmed on the Linux host: the app's peak RSS with one renderer against the
       guideline, and V8's render CPU against Bun's plain bundle on the four pages, the
       condition in native-rendering.md. Deferred on 2026-10-08 until the port and
