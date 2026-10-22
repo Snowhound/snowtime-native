@@ -15,6 +15,8 @@ arch=$(uname -m)
 case "$version/$arch" in
   149.4.0/x86_64) sum=aa30f198b6e7be2188df6498f95053c4c052f212037a01f2c31414d7aca84b53 ;;
   149.4.0/aarch64) sum=54f779336fa85d16ea7950f82d3b8b31326ae09bac84d59763db2c5ceaa0094c ;;
+  150.4.0/x86_64) sum=f48762ca10d1f1fc605a441c5ae430ec8ce1e9e80f14d78fbc42cb878c30b476 ;;
+  150.4.0/aarch64) sum=539e283815a396a5796f32858b42e517b858ebaaeaaad05d03290ee8c864a527 ;;
   *)
     echo "No pinned V8 library for v8 $version on $arch" >&2
     exit 1
